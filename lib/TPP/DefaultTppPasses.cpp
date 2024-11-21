@@ -22,11 +22,10 @@
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include <iostream>
 
 using namespace mlir;
 using namespace mlir::tpp;
-using namespace std;
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTTPPPASSES
@@ -69,6 +68,31 @@ struct DefaultTppPasses
 
 private:
   void constructPipeline() override {
+    // We currently have four branches:
+    //  * Linalg-to-XSMM: the default path, no options needed
+    //  * Linalg-to-Vector: Enable with `linalg-to-vector` flag.
+    //    No further changes done to the IR, lowers straigt to LLVM.
+    //  * Vector-to-XSMM: Enable with `vector-to-xsmm` flag, forces
+    //    `linalg-to-vector` and lowers vector patterns to libxsmm calls.
+    //  * Vector-to-Kernel: Enable with `vector-to-kernel` flag, forces
+    //    `linalg-to-vector` and lowers vector patterns to libxsmm-like
+    //    micro-kernels via specialized lowering of certain vector patterns.
+    assert(!(vectorToXSMM && vectorToKernel) && "XSMM and Kernel lowering are mutually exclusive");
+    bool forceLinalgToVector = (vectorToXSMM || vectorToKernel);
+
+    // List of operations to skip when lowering Linalg to XSMM / Kernel.
+    // This allows further passes to lower to vector, function, codegen
+    // Default is to not skip anything. Only enable when needed.
+    ArrayRef<std::string> skipOperations;
+    // General "linalg-to-vector" choice needs to skip all XSMM matching at linalg level.
+    if (linalgToVector)
+      skipOperations = { "all" };
+    if (vectorToXSMM)
+      skipOperations = { };
+    if (vectorToKernel)
+      skipOperations = { };
+
+    // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
     if (linalgToLoops) {
       // Lower linalg directly to loops.
@@ -102,17 +126,23 @@ private:
       // Bufferize: tensor->memref.
       pm.addPass(createBufferize());
 
-      // TODO: This flag will be removed once the vector path becomes the
-      // default lowering path.
-      if (linalgToVector) {
-	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
+      // Lower Linalg to XSMM.
+      pm.addNestedPass<func::FuncOp>(createLinalgLowering(LinalgLoweringOptions{skipOperations}));
+
+      if (linalgToVector || forceLinalgToVector) {
+        // Vectorizes the remaining Linalg operations
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-        pm.addNestedPass<func::FuncOp>(createVectorContractToOuterproduct());
-      } else {
-        // Lower all Tile operations.
-        pm.addNestedPass<func::FuncOp>(createLinalgLowering());
+
+        if (vectorToXSMM) {
+          pm.addPass(createVectorToXSMM());
+        }
+        if (vectorToKernel) {
+          pm.addPass(createVectorToKernel());
+        }
       }
+
+      // Final cleanup.
       pm.addPass(createCleanup());
     }
 

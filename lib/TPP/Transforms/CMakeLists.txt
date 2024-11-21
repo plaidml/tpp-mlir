@@ -28,6 +28,7 @@ add_mlir_library(TPPTransforms
   BrgemmLinalgTiling.cpp
   SplitReductionDim.cpp
   VectorContractToOuterproduct.cpp
+  VectorContractToFMA.cpp
 
   ADDITIONAL_HEADER_DIRS
     ${PROJECT_SOURCE_DIR}/include/TPP

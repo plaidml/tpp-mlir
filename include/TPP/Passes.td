@@ -21,6 +21,10 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
                            "linalg::LinalgDialect",
                            "xsmm::XsmmDialect",
                            "tensor::TensorDialect"];
+  let options = [
+    ListOption<"skipOperations", "skip-operations", "std::string",
+           "Operations to skip.">
+  ];
 }
 
 def VerifyXsmmCalls : Pass<"verify-xsmm-calls", "func::FuncOp"> {
@@ -62,6 +66,15 @@ def VectorContractToOuterproduct : Pass<
                            "vector::VectorDialect"];
 }
 
+def VectorContractToFMA : Pass<
+    "vector-contract-to-fma"> {
+  let summary = "Perform vector fma lowering of vector contraction ops";
+  let dependentDialects = ["memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "vector::VectorDialect",
+                           "arith::ArithDialect"];
+}
 
 
 def BrgemmLinalgTiling : Pass<"tile-brgemm-linalg"> {
