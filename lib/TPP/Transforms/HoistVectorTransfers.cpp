@@ -88,9 +88,7 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
                         for (auto &op : oldKForOp.getBody()->without_terminator()) {
                                 rewriterNewKForOp.clone(op, mapper);
                         }
-
                         rewriterNewKForOp.create<scf::YieldOp>(locNewKForOp, iterArgsNewKForOp);
-
                 });
                 rewriterNewReductionForOp.create<scf::YieldOp>(locNewReductionForOp, newKForOp.getResult(0));
         });
