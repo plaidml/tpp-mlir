@@ -38,9 +38,20 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     Option<"linalgToVector", "linalg-to-vector",
            "bool", /*default=*/"false",
            "Lower linalg directly to vector.">,
+    Option<"vectorToXSMM", "vector-to-xsmm",
+           "bool", /*default=*/"false",
+           "Lower vector patterns to XSMM calls.">,
+    Option<"vectorToKernel", "vector-to-kernel",
+           "bool", /*default=*/"false",
+           "Lower vector patterns to micro-kernels.">,
     Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
            "bool", /*default=*/"false",
-           "Lower non-constant packs and unpacks reverting any dim permutations.">
+           "Lower non-constant packs and unpacks reverting any dim permutations.">,
+    ListOption<"lhsTile", "lhsTile",
+           "unsigned", "Lhs tile size for brgemm operation.">,
+    ListOption<"rhsTile", "rhsTile",
+           "unsigned", "Rhs tile size for brgemm operation.">,
+
   ];
 }
 
@@ -66,6 +77,22 @@ def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
   let dependentDialects = ["xsmm::XsmmDialect",
                            "scf::SCFDialect",
                            "memref::MemRefDialect"];
+  let options = [
+    ListOption<"skipOperations", "skip-operations", "std::string",
+           "Operations to skip lowering linalg-to-xsmm directly.">
+  ];
+}
+
+def VectorToXSMM : Pass<"vector-to-xsmm", "ModuleOp"> {
+  let summary = "Lower Vector operations to XSMM functions.";
+  let dependentDialects = ["vector::VectorDialect",
+                           "scf::SCFDialect"];
+}
+
+def VectorToKernel : Pass<"vector-to-kernel", "ModuleOp"> {
+  let summary = "Lower Vector operations to micro-kernel special lowering.";
+  let dependentDialects = ["vector::VectorDialect",
+                           "scf::SCFDialect"];
 }
 
 def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {

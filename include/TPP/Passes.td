@@ -21,6 +21,10 @@ def ConvertLinalgToXsmm : Pass<"convert-linalg-to-xsmm", "func::FuncOp"> {
                            "linalg::LinalgDialect",
                            "xsmm::XsmmDialect",
                            "tensor::TensorDialect"];
+  let options = [
+    ListOption<"skipOperations", "skip-operations", "std::string",
+           "Operations to skip.">
+  ];
 }
 
 def VerifyXsmmCalls : Pass<"verify-xsmm-calls", "func::FuncOp"> {
@@ -73,6 +77,32 @@ def VectorContractToOuterproduct : Pass<
                            "tensor::TensorDialect",
                            "vector::VectorDialect"];
 }
+
+def VectorContractToFMA : Pass<
+    "vector-contract-to-fma"> {
+  let summary = "Perform vector fma lowering of vector contraction ops";
+  let dependentDialects = ["memref::MemRefDialect",
+                           "scf::SCFDialect",
+                           "tensor::TensorDialect",
+                           "vector::VectorDialect",
+                           "arith::ArithDialect"];
+}
+
+
+def BrgemmLinalgTiling : Pass<"tile-brgemm-linalg"> {
+  let summary = "Tile bregmm  matmul and reduction dimension.";
+  let description = [{
+    Tiles the innermost dimensions of the batch reduce matmul operation. Additionally, it swaps the reduction and k dimension loop. The final loop structure is as follows: M-loop->N-loop->reduction-loop->K-loop. For example: --tile-brgemm-linalg="lhsTile=8,8 rhsTile=8,16".
+  }];
+  let dependentDialects = ["linalg::LinalgDialect",
+                           "memref::MemRefDialect",
+                           "arith::ArithDialect"];
+  let options = [
+         ListOption<"mTileShape", "lhsTile", "unsigned", "Input for the tile shape of m x k dim. Tile size should not be greater than the dimension size. Example: lhsTile=8,8">,
+         ListOption<"nTileShape", "rhsTile", "unsigned", "Input for the tile shape of k x n dim. Tile size should not be greater than the dimension size. Example: rhsTile=8,16">,
+  ];
+}
+
 
 
 def ConvertXsmmToFunc : Pass<"convert-xsmm-to-func", "ModuleOp"> {
