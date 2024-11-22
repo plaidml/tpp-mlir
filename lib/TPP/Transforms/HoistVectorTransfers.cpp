@@ -20,7 +20,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/IRMapping.h"
-#include <iostream>
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_HOISTVECTORTRANSFERS
@@ -57,10 +56,10 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
         if (KForOp == NULL)
                 return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
+
 	// Move the vector transfer read before the reduction and k loop
         rewriter.setInsertionPointAfter(subviewOp);
         auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
-        retriveVectorReadOp.replaceAllUsesWith(cloneVectorReadOp);
 
         // Code to re-create the reduction and k loop with iter args
         auto *nextOp = (*cloneVectorReadOp).getNextNode();
@@ -85,16 +84,6 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
                         mlir::IRMapping mapper;
                         mapper.map(oldReductionForOp.getInductionVar(), ivNewReductionForOp);
                         mapper.map(oldKForOp.getInductionVar(), ivNewKForOp);
-
-                        for (auto [origArgReduction, newArgReduction] :
-                        llvm::zip(oldReductionForOp.getRegionIterArgs(), iterArgsNewReductionForOp)) {
-                                mapper.map(origArgReduction, newArgReduction);
-                        }
-
-                        for (auto [origArgK, newArgK] :
-                        llvm::zip(oldKForOp.getRegionIterArgs(), iterArgsNewKForOp)) {
-                                mapper.map(origArgK, newArgK);
-                        }
 
                         for (auto &op : oldKForOp.getBody()->without_terminator()) {
                                 rewriterNewKForOp.clone(op, mapper);
