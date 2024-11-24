@@ -74,7 +74,7 @@ class TensorDialect;
 
 namespace vector {
 class VectorDialect;
-} // namespace tensor
+} // namespace vector
 
 namespace tpp {
 

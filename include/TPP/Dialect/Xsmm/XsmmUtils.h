@@ -25,6 +25,22 @@ class ArrayAttr;
 class Operation;
 
 namespace xsmm {
+
+struct BrgemmInfo {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  int64_t batch;
+
+  int64_t lda;
+  int64_t ldb;
+  int64_t ldc;
+  int64_t strideA;
+  int64_t strideB;
+
+  bool isVnni = false;
+};
+
 class UnaryKindAttr;
 
 struct UnaryInfo {
@@ -87,8 +103,14 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType);
 
 // Compute the broadcasting flags for 'operandType' based on 'outputType'.
 enum class OperandPos { LHS = 0, RHS = 1 };
+FailureOr<BinaryFlags> getBinFlags(ArrayRef<int64_t> shapeOutput,
+                                   ArrayRef<int64_t> shapeOperand,
+                                   OperandPos operandNumber);
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber);
+FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
+                                                Type outputType,
+                                                OperandPos operandNumber);
 
 FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
 
@@ -124,7 +146,20 @@ template <typename DispatchOpTy>
 FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
                                                  DispatchOpTy dispatchOpTy,
                                                  bool returnNone);
+std::optional<unsigned>
+getPosInCodomain(unsigned dim, vector::ContractionOp contractOp, AffineMap map);
+FailureOr<xsmm::BrgemmInfo> checkAccess(PatternRewriter &rewriter,
+                                        vector::ContractionOp contractOp,
+                                        unsigned m, unsigned n, unsigned k,
+                                        std::optional<unsigned> batchPos,
+                                        SmallVector<Value> inputs,
+                                        ArrayRef<AffineMap> indexingMap);
 
+FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
+                                         vector::ContractionOp contractOp,
+                                         SmallVector<Value> &inputs,
+                                         SmallVector<Value> &output,
+                                         ArrayRef<AffineMap> indexingMap);
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

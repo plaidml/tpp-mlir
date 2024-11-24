@@ -59,5 +59,6 @@ private:
   void constructPipeline() override {
     LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-xsmm passes\n");
     pm.addPass(createInsertTranspose());
+    pm.addPass(createConvertVectorToXsmm());
   }
 };
