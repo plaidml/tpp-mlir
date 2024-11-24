@@ -10,6 +10,7 @@
 #define TPP_DIALECT_TPP_PASSBUNDLES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/Dialect/PDL/IR/PDLDialect.td"
 
 def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   let summary = "The default compiler lowering pipeline";
@@ -50,8 +51,7 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     ListOption<"lhsTile", "lhsTile",
            "unsigned", "Lhs tile size for brgemm operation.">,
     ListOption<"rhsTile", "rhsTile",
-           "unsigned", "Rhs tile size for brgemm operation.">,
-
+           "unsigned", "Rhs tile size for brgemm operation.">
   ];
 }
 
@@ -85,8 +85,14 @@ def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
 
 def VectorToXSMM : Pass<"vector-to-xsmm", "ModuleOp"> {
   let summary = "Lower Vector operations to XSMM functions.";
-  let dependentDialects = ["vector::VectorDialect",
-                           "scf::SCFDialect"];
+  let dependentDialects = ["scf::SCFDialect",
+			   "mlir::pdl::PDLDialect",
+			   "mlir::pdl_interp::PDLInterpDialect",
+                    	   "mlir::vector::VectorDialect", 
+			   "func::FuncDialect",
+                    	   "memref::MemRefDialect", 
+			   "LLVM::LLVMDialect", 
+			   "BuiltinDialect"];
 }
 
 def VectorToKernel : Pass<"vector-to-kernel", "ModuleOp"> {

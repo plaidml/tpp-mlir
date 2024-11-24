@@ -7,9 +7,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/Support/Debug.h"
@@ -32,7 +40,7 @@ namespace tpp {
 // Apply collection of vector-level passes that map vector patterns to
 // libxsmm call pairs (dispatch, invoke).
 struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
-                    PassBundle<ModuleOp> {
+                      PassBundle<ModuleOp> {
   void runOnOperation() override {
     auto module = getOperation();
 
@@ -49,6 +57,6 @@ struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
 private:
   void constructPipeline() override {
     LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-xsmm passes\n");
-    // Not Implemented Yet.
+    pm.addPass(createInsertTranspose());
   }
 };

@@ -8,17 +8,65 @@
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/Compiler.h"
+#include <map>
+#define DEBUG_TYPE "xsmm-utils"
+
+using namespace mlir;
+using namespace mlir::linalg;
+using namespace structured_match;
+
 namespace mlir {
 namespace xsmm {
 namespace utils {
+
+// Examples:
+// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
+// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
+// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
+// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
+// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
+static void
+computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
+                       ArrayRef<int64_t> lowerRankShape,
+                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
+  // Initialize new shapes with [1] * higherRank.
+  int64_t higherRank = higherRankShape.size();
+  int64_t lowerRank = lowerRankShape.size();
+
+  reshapeOutputShape.assign(higherRank, 1);
+
+  int64_t higherRankDim;
+  int64_t lowerRankDim;
+
+  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
+       i--, j--) {
+    higherRankDim = higherRankShape[i];
+    lowerRankDim = lowerRankShape[j];
+
+    if (lowerRankDim == 1 && higherRankDim > 1)
+      reshapeOutputShape[i] = 1;
+    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
+             (lowerRankDim == higherRankDim)) {
+      reshapeOutputShape[i] = lowerRankDim;
+    } else if (higherRankDim != lowerRankDim)
+      assert(false && "bCast semantics for identity op broken");
+  }
+}
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
   auto elemType = getElementTypeOrSelf(type);
@@ -91,6 +139,62 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   return unaryInfo;
 }
 
+FailureOr<UnaryInfo> getVectorUnaryInfo(MemRefType inputType,
+                                        MemRefType outputType,
+                                        VectorType inputVectorType,
+                                        VectorType outputVectorType,
+                                        UnaryFlags inputFlag) {
+  if (!outputVectorType.hasStaticShape() ||
+      !isa<FloatType>(outputVectorType.getElementType())) {
+    return failure();
+  }
+
+  UnaryInfo unaryInfo;
+  unaryInfo.m = 1;
+  for (size_t i = 0; i < outputVectorType.getShape().size() - 1; i++) {
+    unaryInfo.m *= outputVectorType.getShape()[i];
+  }
+  unaryInfo.n =
+      outputVectorType.getShape()[outputVectorType.getShape().size() - 1];
+  int ldo = 1;
+
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  SmallVector<int64_t> bShapeInput;
+  computeBcastShapeInput(inputType.getShape(), inputVectorType.getShape(),
+                         bShapeInput);
+  auto memrefType = MemRefType::get(bShapeInput, inputType.getElementType());
+  if (failed(getStridesAndOffset(memrefType, strides, offset)))
+    return failure();
+  ldo = strides[0];
+
+  unaryInfo.ldo = ldo;
+  int ldi = 1;
+  // If we are broascasting a row into cols, the leading
+  // dimension is 1, same for scalar broadcast.
+  if (inputFlag == UnaryFlags::BCAST_ROW ||
+      inputFlag == UnaryFlags::BCAST_SCALAR) {
+    ldi = 1;
+  } // If we are broascasting a col into rows, the leading
+  // dimension is the size of the tensor.
+  else if (inputFlag == UnaryFlags::BCAST_COL) {
+    ldi = inputVectorType.getShape()[0];
+  } else {
+    SmallVector<int64_t> strides;
+    int64_t offset;
+    SmallVector<int64_t> bShapeInput;
+    computeBcastShapeInput(outputType.getShape(), outputVectorType.getShape(),
+                           bShapeInput);
+    auto memrefType =
+        MemRefType::get(bShapeInput, outputVectorType.getElementType());
+    if (failed(getStridesAndOffset(memrefType, strides, offset)))
+      return failure();
+    ldi = strides[0];
+  }
+  unaryInfo.ldi = ldi;
+  return unaryInfo;
+}
+
 FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
                                     BinaryFlags rhsFlag, Value output) {
   Type outputType = output.getType();
@@ -152,40 +256,6 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
   return binaryInfo;
 }
 
-// Examples:
-// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
-// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
-// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
-// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
-// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
-static void
-computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
-                       ArrayRef<int64_t> lowerRankShape,
-                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
-  // Initialize new shapes with [1] * higherRank.
-  int64_t higherRank = higherRankShape.size();
-  int64_t lowerRank = lowerRankShape.size();
-
-  reshapeOutputShape.assign(higherRank, 1);
-
-  int64_t higherRankDim;
-  int64_t lowerRankDim;
-
-  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    higherRankDim = higherRankShape[i];
-    lowerRankDim = lowerRankShape[j];
-
-    if (lowerRankDim == 1 && higherRankDim > 1)
-      reshapeOutputShape[i] = 1;
-    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
-             (lowerRankDim == higherRankDim))
-      reshapeOutputShape[i] = lowerRankDim;
-    else if (higherRankDim != lowerRankDim)
-      assert(false && "bCast semantics for identity op broken");
-  }
-}
-
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(isa<ShapedType>(outputType) && "expect shaped type on output");
   assert(cast<ShapedType>(outputType).getRank() == 2 &&
@@ -214,7 +284,8 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   if (llvm::all_of(shapeInput, isOne))
     return xsmm::UnaryFlags::BCAST_SCALAR;
 
-  if (shapeInput[1] == 1 && shapeOutput[1] > 1)
+  if (shapeInput[shapeInput.size() - 1] == 1 &&
+      shapeOutput[shapeInput.size() - 1] > 1)
     return xsmm::UnaryFlags::BCAST_ROW;
 
   if (shapeInput[0] == 1 && shapeOutput[0] > 1)
@@ -245,7 +316,6 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
   assert(shapeOutput.size() == bOperandShape.size());
   assert(shapeOutput.size() == 2);
-
   auto getBCastEnum = [](BCastType bCastType,
                          OperandPos operandPos) -> xsmm::BinaryFlags {
     switch (bCastType) {
@@ -285,6 +355,167 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
     return getBCastEnum(BCastType::COL, operandNumber);
 
   return failure();
+}
+
+FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
+  // Not shaped type, the leading dimension is the single scalar.
+  auto memref = dyn_cast<MemRefType>(type);
+  if (!memref)
+    return 1;
+  // For 1d memref we cannot use the stride as leading dimension, but the
+  // leading dimension is the dimension itself.
+  if (memref.getRank() == 1)
+    return memref.getShape()[0];
+
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memref, strides, offset)))
+    return failure();
+  // fail if the strides are non-constant
+  if (llvm::any_of(strides, [](int64_t stride) {
+        return stride == ShapedType::kDynamic;
+      }))
+    return failure();
+  return strides[pos];
+}
+
+bool isTwoDTransposeOp(vector::TransposeOp transposeOp) {
+  auto operandType = dyn_cast<VectorType>(transposeOp.getOperand().getType());
+  bool isVnni = vnni::utils::isInVnniLayout(operandType.getRank(), operandType);
+  if (isVnni || operandType.getRank() != 2 ||
+      dyn_cast<VectorType>(transposeOp.getResult().getType()).getRank() != 2 ||
+      (isa<scf::ForallOp>(transposeOp->getParentOp()) &&
+       dyn_cast<scf::ForallOp>(transposeOp->getParentOp()).getRank() != 2))
+    return false;
+  return true;
+}
+
+// Extract the operands to be used in the function call. For each memref operand
+// extract the aligned pointer and the offset.
+SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
+                               ValueRange operands, IntegerAttr dataTypeAttr,
+                               Operation *parentOp, bool getResults) {
+  SmallVector<Value> res;
+  builder.setInsertionPoint(parentOp);
+  for (Value operand : operands) {
+    auto memrefType = dyn_cast<MemRefType>(operand.getType());
+    if (!memrefType) {
+      res.push_back(operand);
+      continue;
+    }
+    auto [ptr, offset] = ::mlir::utils::getPtrAndOffset(builder, operand, loc);
+    res.push_back(ptr);
+    res.push_back(offset);
+  }
+  return res;
+}
+
+SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
+                                            ValueRange operands) {
+  SmallVector<Type> results;
+  // One extra operand for datatype
+  for (Value operand : operands) {
+    Type operandType = operand.getType();
+    if (auto memrefType = dyn_cast<MemRefType>(operandType)) {
+      // TODO: non-POD will require an LLVMTypeConverter.
+      Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
+      results.push_back(basePtrType);
+      results.push_back(builder.getIndexType()); // offset
+    } else {
+      results.push_back(operand.getType());
+    }
+  }
+  return results;
+}
+
+int64_t getOredFlags(ArrayAttr flags) {
+  int64_t oredFlag = 0;
+  for (auto flag : flags) {
+    int64_t intAttr = dyn_cast<IntegerAttr>(flag).getInt();
+    // LIBXSMM is col-major, swap A and B flags.
+    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
+      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
+      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
+    }
+    oredFlag |= intAttr;
+  }
+  return oredFlag;
+}
+
+func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
+                               ArrayRef<Value> dispatchOperands,
+                               ArrayRef<Type> dispatchOperandTypes,
+                               ModuleOp module, FlatSymbolRefAttr fnName) {
+  auto libFnType = rewriter.getFunctionType(
+      dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
+
+  if (!module.lookupSymbol(fnName.getAttr())) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    // Insert before module terminator.
+    rewriter.setInsertionPoint(module.getBody(),
+                               std::prev(module.getBody()->end()));
+    func::FuncOp funcOp =
+        rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
+    funcOp.setPrivate();
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointAfter(dispatchOperands.back().getDefiningOp());
+
+  func::CallOp call = rewriter.create<func::CallOp>(
+      loc, fnName.getValue(), IntegerType::get(rewriter.getContext(), 64),
+      dispatchOperands);
+  return call;
+}
+
+func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
+                             ModuleOp module, SmallVector<Value> inputRange,
+                             SmallVector<Value> prependOperands,
+                             int prependIndex, SmallVector<Value> operandRange,
+                             StringRef invokeName, DataTypeAttr dtype,
+                             bool getResult) {
+  SmallVector<Value> finalOperands;
+  finalOperands.append(operandRange.begin(), operandRange.end());
+  SmallVector<Value> extraOperands;
+  size_t i = 0;
+  while (i < inputRange.size()) {
+    if ((int)i == prependIndex) {
+      extraOperands.append(prependOperands.begin(), prependOperands.end());
+    }
+    extraOperands.push_back(inputRange[i]);
+    i++;
+  }
+  if (prependIndex >= 0 && inputRange.size() == 0) {
+    extraOperands.append(prependOperands.begin(), prependOperands.end());
+  }
+  finalOperands.append(extraOperands.begin(), extraOperands.end());
+  SmallVector<Type> invokeTypes =
+      xsmm::utils::extractInvokeOperandTypes(rewriter, finalOperands);
+  auto loc = parentOp->getLoc();
+  auto libFnType = rewriter.getFunctionType(invokeTypes, {});
+  FlatSymbolRefAttr fnName =
+      SymbolRefAttr::get(rewriter.getContext(), invokeName);
+
+  if (!module.lookupSymbol(fnName)) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    // Insert before module terminator.
+    rewriter.setInsertionPoint(module.getBody(),
+                               std::prev(module.getBody()->end()));
+    func::FuncOp funcOp =
+        rewriter.create<func::FuncOp>(loc, invokeName, libFnType);
+    funcOp.setPrivate();
+  }
+
+  SmallVector<Value> operands = xsmm::utils::getOperands(
+      rewriter, loc, finalOperands, dtype, parentOp, getResult);
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(parentOp);
+  func::CallOp call =
+      rewriter.create<func::CallOp>(loc, fnName, TypeRange(), operands);
+
+  return call;
 }
 
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
@@ -402,28 +633,6 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   }
 
   return fusedMatch;
-}
-
-FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
-  // Not shaped type, the leading dimension is the single scalar.
-  auto memref = dyn_cast<MemRefType>(type);
-  if (!memref)
-    return 1;
-  // For 1d memref we cannot use the stride as leading dimension, but the
-  // leading dimension is the dimension itself.
-  if (memref.getRank() == 1)
-    return memref.getShape()[0];
-
-  SmallVector<int64_t> strides;
-  int64_t offset;
-  if (failed(getStridesAndOffset(memref, strides, offset)))
-    return failure();
-  // fail if the strides are non-constant
-  if (llvm::any_of(strides, [](int64_t stride) {
-        return stride == ShapedType::kDynamic;
-      }))
-    return failure();
-  return strides[pos];
 }
 
 template <typename DispatchOpTy>

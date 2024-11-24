@@ -69,6 +69,17 @@ FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
   return failure();
 }
 
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
+  return isInVnniLayout((int64_t)expectedRank, vector);
+}
+
+bool isInVnniLayout(int64_t expectedRank, VectorType vector) {
+  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16()) {
+    return false;
+  }
+  return vector.getShape().back() == vnni::utils::getVnniBlockingFactor(vector);
+}
+
 } // namespace utils
 } // namespace vnni
 } // namespace mlir
