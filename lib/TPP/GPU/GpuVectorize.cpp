@@ -29,7 +29,6 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
-using namespace mlir::vector;
 
 namespace mlir {
 namespace tpp {

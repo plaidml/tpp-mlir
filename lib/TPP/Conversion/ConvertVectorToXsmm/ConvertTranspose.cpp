@@ -19,7 +19,6 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/Operation.h"
@@ -40,23 +39,74 @@ using namespace mlir::func;
 
 #define DEBUG_TYPE "convert-transpose"
 
+pair<Operation *, Operation *>
+getTransposeOperation(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
+                      Type outputType, xsmm::UnaryKind unaryKind,
+                      Operation *input, Operation *output,
+                      Operation *transposeOp) {
+  std::string dispatchName = "xsmm_unary_dispatch";
+  std::string invokeName = "xsmm_unary_invoke";
+  Location loc = transposeOp->getLoc();
+
+  ModuleOp module = transposeOp->getParentOfType<ModuleOp>();
+  auto dtype =
+      xsmm::utils::getDataType(rewriter, transposeOp->getOperand(0).getType());
+
+  auto functionOp = transposeOp->getParentOfType<func::FuncOp>();
+  SmallVector<Value, 10> dispatchOperands;
+  SmallVector<Type, 10> dispatchOperandTypes;
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(&*functionOp.getBody().op_begin());
+  xsmm::UnaryKindAttr kind =
+      xsmm::UnaryKindAttr::get(rewriter.getContext(), unaryKind);
+  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, cast<TypedAttr>(kind)));
+  dispatchOperandTypes.push_back(integer64);
+
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, cast<TypedAttr>(dtype)));
+  dispatchOperandTypes.push_back(integer64);
+
+  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
+      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo.m, unaryInfo.n,
+                                               unaryInfo.ldi, unaryInfo.ldo});
+  for (auto idx = 0; idx < dims.size(); idx++) {
+    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+        loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
+    dispatchOperandTypes.push_back(integer64);
+  }
+
+  int64_t oredFlag =
+      xsmm::utils::getUnaryOredFlags(rewriter, xsmm::UnaryFlags::NONE);
+  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
+      loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
+  dispatchOperandTypes.push_back(integer64);
+
+  auto dispatched = xsmm::utils::buildDispatchCall(
+      rewriter, loc, dispatchOperands, dispatchOperandTypes, module,
+      SymbolRefAttr::get(transposeOp->getContext(), dispatchName));
+
+  rewriter.setInsertionPoint(transposeOp);
+  SmallVector<Value> operandRange{rewriter.create<arith::ConstantOp>(
+                                      loc, integer64, cast<TypedAttr>(dtype)),
+                                  dispatched.getResult(0), input->getOperand(0),
+                                  output->getOperand(1)};
+  SmallVector<Value> inputs;
+  SmallVector<Value> preceedingOperands;
+  auto invokeCall = xsmm::utils::buildInvokeCall(
+      rewriter, output, module, inputs, preceedingOperands, -1, operandRange,
+      invokeName, dtype, true);
+
+  return std::make_pair(&*dispatched, &*invokeCall);
+}
+
 static std::pair<Operation *, Operation *>
 buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
                  Operation *input, Operation *output, Type outputType) {
   LLVM_DEBUG(llvm::dbgs() << "BuildTransposeOp\n");
   Value source = input->getOperand(0);
   VectorType outType = cast<VectorType>(outputType);
-  std::string dispatchName = "xsmm_unary_dispatch";
-  std::string invokeName = "xsmm_unary_invoke";
-  Location loc = transposeOp->getLoc();
-
-  ModuleOp module = transposeOp->getParentOfType<ModuleOp>();
-  SmallVector<Value, 10> dispatchOperands;
-  SmallVector<Type, 10> dispatchOperandTypes;
-  IntegerType integer64 = IntegerType::get(rewriter.getContext(), 64);
-  auto dtype =
-      xsmm::utils::getDataType(rewriter, transposeOp->getOperand(0).getType());
-
   if (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::TRANSPOSE,
                                   outType)) {
     memref::ExpandShapeOp expandShapeOp =
@@ -79,54 +129,9 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
 
     // If `OpTy` is unary or binary we need to dispatch and extra
     // integer for the kind of operation to invoke.
-    xsmm::UnaryKindAttr kind =
-        xsmm::UnaryKindAttr::get(rewriter.getContext(), xsmm::UnaryKind::VNNI2);
-
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, cast<TypedAttr>(kind)));
-    dispatchOperandTypes.push_back(integer64);
-
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, cast<TypedAttr>(dtype)));
-    dispatchOperandTypes.push_back(integer64);
-
-    DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-        rewriter.getContext(), ArrayRef<int64_t>{unaryInfo.m, unaryInfo.n,
-                                                 unaryInfo.ldi, unaryInfo.ldo});
-    for (auto idx = 0; idx < dims.size(); idx++) {
-      dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-          loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
-      dispatchOperandTypes.push_back(integer64);
-    }
-
-    // Dispatch the flags. Pass to the library the already ored-flag to
-    // avoid changing the interface every time we add a new flag. Flags
-    // are assumed to be verified before (i.e., op verifier).
-    auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
-        rewriter.getContext(), xsmm::UnaryFlags::NONE));
-    int64_t oredFlag = xsmm::utils::getOredFlags(flags);
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
-    dispatchOperandTypes.push_back(integer64);
-
-    auto dispatched = xsmm::utils::buildDispatchCall(
-        rewriter, loc, dispatchOperands, dispatchOperandTypes, module,
-        SymbolRefAttr::get(transposeOp->getContext(), dispatchName));
-
-    rewriter.setInsertionPoint(transposeOp);
-    SmallVector<Value> operandRange;
-    operandRange.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, cast<TypedAttr>(dtype)));
-    operandRange.push_back(dispatched.getResult(0));
-    operandRange.push_back(input->getOperand(0));
-    operandRange.push_back(output->getOperand(1));
-    SmallVector<Value> inputs;
-    SmallVector<Value> preceedingOperands;
-    auto invokeCall = xsmm::utils::buildInvokeCall(
-        rewriter, output, module, inputs, preceedingOperands, -1, operandRange,
-        invokeName, dtype, true);
-
-    return std::make_pair(&*dispatched, &*invokeCall);
+    return getTransposeOperation(rewriter, unaryInfo, outputType,
+                                 xsmm::UnaryKind::VNNI2, input, output,
+                                 transposeOp);
   }
   auto unaryInfo = xsmm::utils::getVectorUnaryInfo(
       dyn_cast<MemRefType>(input->getOperand(0).getType()),
@@ -134,59 +139,17 @@ buildTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
       dyn_cast<VectorType>(input->getResult(0).getType()),
       dyn_cast<VectorType>(output->getOperand(0).getType()),
       xsmm::UnaryFlags::NONE);
-  auto functionOp = transposeOp->getParentOfType<func::FuncOp>();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(&*functionOp.getBody().op_begin());
+  auto temp = unaryInfo->n;
+  unaryInfo->n = unaryInfo->m;
+  unaryInfo->m = temp;
 
-  xsmm::UnaryKindAttr kind = xsmm::UnaryKindAttr::get(
-      rewriter.getContext(), xsmm::UnaryKind::TRANSPOSE);
+  temp = unaryInfo->ldi;
+  unaryInfo->ldi = unaryInfo->ldo;
+  unaryInfo->ldo = temp;
 
-  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, cast<TypedAttr>(kind)));
-  dispatchOperandTypes.push_back(integer64);
-
-  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, cast<TypedAttr>(dtype)));
-  dispatchOperandTypes.push_back(integer64);
-
-  // Dispatch the inputs.
-  DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
-      rewriter.getContext(), ArrayRef<int64_t>{unaryInfo->n, unaryInfo->m,
-                                               unaryInfo->ldo, unaryInfo->ldi});
-
-  for (auto idx = 0; idx < dims.size(); idx++) {
-    dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-        loc, integer64, rewriter.getIntegerAttr(integer64, dims[idx])));
-    dispatchOperandTypes.push_back(integer64);
-  }
-
-  // Dispatch the flags. Pass to the library the already ored-flag to
-  // avoid changing the interface every time we add a new flag. Flags
-  // are assumed to be verified before (i.e., op verifier).
-  auto flags = rewriter.getArrayAttr(
-      xsmm::UnaryFlagsAttr::get(rewriter.getContext(), xsmm::UnaryFlags::NONE));
-
-  int64_t oredFlag = xsmm::utils::getOredFlags(flags);
-  dispatchOperands.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, IntegerAttr::get(rewriter.getI64Type(), oredFlag)));
-  dispatchOperandTypes.push_back(integer64);
-
-  auto dispatched = xsmm::utils::buildDispatchCall(
-      rewriter, loc, dispatchOperands, dispatchOperandTypes, module,
-      SymbolRefAttr::get(transposeOp->getContext(), dispatchName));
-
-  SmallVector<Value> operandRange;
-  operandRange.push_back(rewriter.create<arith::ConstantOp>(
-      loc, integer64, cast<TypedAttr>(dtype)));
-  operandRange.push_back(dispatched.getResult(0));
-  operandRange.push_back(input->getOperand(0));
-  operandRange.push_back(output->getOperand(1));
-  SmallVector<Value> inputs;
-  SmallVector<Value> preceedingOperands;
-  auto invokeCall = xsmm::utils::buildInvokeCall(
-      rewriter, output, module, inputs, preceedingOperands, -1, operandRange,
-      invokeName, dtype, true);
-  return std::make_pair(&*dispatched, &*invokeCall);
+  return getTransposeOperation(rewriter, *unaryInfo, outputType,
+                               xsmm::UnaryKind::TRANSPOSE, input, output,
+                               transposeOp);
 }
 
 static LogicalResult
@@ -214,15 +177,6 @@ validateTransposeOpImpl(PatternRewriter &rewriter, Operation *transposeOp,
     }
     auto stridesOnOutput = mlir::utils::getStaticStrides(output->getOperand(1));
     if (failed(stridesOnOutput)) {
-      return failure(transposeOp);
-    }
-    auto unaryInfo = xsmm::utils::getVectorUnaryInfo(
-        dyn_cast<MemRefType>(input->getOperand(0).getType()),
-        dyn_cast<MemRefType>(output->getOperand(1).getType()),
-        dyn_cast<VectorType>(input->getResult(0).getType()),
-        dyn_cast<VectorType>(output->getOperand(0).getType()),
-        xsmm::UnaryFlags::NONE);
-    if (failed(unaryInfo)) {
       return failure(transposeOp);
     }
   } else {

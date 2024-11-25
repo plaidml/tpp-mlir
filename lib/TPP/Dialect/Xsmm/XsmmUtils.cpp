@@ -23,6 +23,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include <map>
 #define DEBUG_TYPE "xsmm-utils"
 
@@ -441,6 +442,14 @@ int64_t getOredFlags(ArrayAttr flags) {
     }
     oredFlag |= intAttr;
   }
+  return oredFlag;
+}
+
+int64_t getUnaryOredFlags(PatternRewriter &rewriter,
+                          xsmm::UnaryFlags unaryFlags) {
+  auto flags = rewriter.getArrayAttr(
+      xsmm::UnaryFlagsAttr::get(rewriter.getContext(), unaryFlags));
+  int64_t oredFlag = xsmm::utils::getOredFlags(flags);
   return oredFlag;
 }
 

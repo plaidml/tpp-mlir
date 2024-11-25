@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertTranspose.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

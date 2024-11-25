@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 
 namespace mlir {
 class Type;
@@ -100,6 +99,9 @@ ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
 
 int64_t getOredFlags(ArrayAttr flags);
+
+int64_t getUnaryOredFlags(PatternRewriter &rewriter,
+                          xsmm::UnaryFlags unaryFlags);
 
 SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
                                             ValueRange operands);
