@@ -42,7 +42,7 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
     if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
             xsmm::DataTypeAttr::get(rewriter.getContext(),
                                     xsmm::DataType::BF16) &&
-        linalgOp.getIteratorTypes().size() >= 5 &&
+        linalgOp.getIteratorTypes().size() >= 4 &&
         linalgOp.getNumOperands() == 3) {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
@@ -72,7 +72,8 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       }
       auto map0 = linalgOp.getIndexingMapsArray()[0];
       auto map1 = linalgOp.getIndexingMapsArray()[1];
-      map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1), 3);
+      map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1),
+                               map0.getNumResults());
       int map1Index = map1.getNumResults() - 3;
       AffineExpr expr = map1.getResult(map1Index);
       if (isa<AffineBinaryOpExpr>(expr)) {
