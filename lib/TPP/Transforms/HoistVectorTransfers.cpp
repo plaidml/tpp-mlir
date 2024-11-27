@@ -33,39 +33,86 @@ using namespace vector;
 namespace mlir {
 namespace tpp {
 
+enum class MatMulType { Standard, Batch, BatchReduce };
+
 struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
-       
-	// Check whether the linalg tiling + vector contract pattern matches 
-        auto retriveVectorReadOp = contractOp.getAcc().getDefiningOp<mlir::vector::TransferReadOp>();
-        if (retriveVectorReadOp == NULL)
-                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
-        
-        auto subviewOp = retriveVectorReadOp.getOperand(0).getDefiningOp<memref::SubViewOp>();
-        if (subviewOp == NULL)
-                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
-        
-        auto ReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(subviewOp->getNextNode());
-        if (ReductionForOp == NULL)
+
+        // Check whether the linalg tiling + vector contract pattern matches for the 4-nested loop structure
+        auto oldKForOp =  contractOp->getParentOfType<scf::ForOp>();
+        if (!oldKForOp)
                 return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
-        auto KForOp = llvm::dyn_cast<mlir::scf::ForOp>(ReductionForOp.getBody()->front());
-        if (KForOp == NULL)
+        auto oldReductionForOp = oldKForOp->getParentOfType<scf::ForOp>();
+        if (!oldReductionForOp)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
+
+        auto oldNForOp = oldReductionForOp->getParentOfType<scf::ForOp>();
+        if (!oldNForOp)
+                return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
+
+        auto oldMForOp = oldNForOp->getParentOfType<scf::ForOp>();
+        if (!oldMForOp)
                 return rewriter.notifyMatchFailure(contractOp, "Not a linalg tile + vector contract operation");
 
 
-	// Move the vector transfer read before the reduction and k loop
+        // Check the vector contract operation satisfies the required pattern.
+        // Check the ACC, LHS, and RHS of contract operation
+        auto vectorReadOpAcc = contractOp.getAcc().getDefiningOp<mlir::vector::TransferReadOp>();
+        if (!vectorReadOpAcc)
+                return failure();
+
+        auto subviewOp = vectorReadOpAcc.getOperand(0).getDefiningOp<memref::SubViewOp>();
+        if (!subviewOp)
+                return failure();
+
+        auto vectorReadOpLHS = contractOp.getLhs().getDefiningOp<mlir::vector::TransferReadOp>();
+        if (!vectorReadOpLHS)
+                return failure();
+
+        auto vectorReadOpRHS = contractOp.getRhs().getDefiningOp<mlir::vector::TransferReadOp>();
+        if (!vectorReadOpRHS)
+                return failure();
+
+
+
+        // Check the operation type MatMul, B-MatMul, or BR-MatMul
+        auto contractIteratorTypes = contractOp.getIteratorTypesArray();
+        MatMulType matmulType;
+
+        if (contractIteratorTypes.size() > 3) {
+                matmulType = contractIteratorTypes[contractIteratorTypes.size() - 4] == vector::IteratorType::parallel ? MatMulType::Batch : MatMulType::BatchReduce;
+                if (matmulType == MatMulType::Batch)
+                        return rewriter.notifyMatchFailure(contractOp, "Batch matmul not supported");
+        } else if (contractIteratorTypes.size() == 3) {
+                matmulType = MatMulType::Standard;
+        } else {
+                return rewriter.notifyMatchFailure(contractOp, "The vector contract operation is not a gemm");
+        }
+
+        auto vectorReadOpLHSType = cast<ShapedType>(vectorReadOpLHS.getType());
+        auto vectorReadOpRHSType = cast<ShapedType>(vectorReadOpRHS.getType());
+
+        if (matmulType == MatMulType::BatchReduce && (vectorReadOpLHSType.getRank() != 3 || vectorReadOpRHSType.getRank() != 3))
+                return failure();
+
+        if (matmulType == MatMulType::Standard  && (vectorReadOpLHSType.getRank() != 2 || vectorReadOpRHSType.getRank() != 2))
+                return failure();
+
+        //Check the K-dim to be 1
+        int64_t K = vectorReadOpLHSType.getDimSize(vectorReadOpLHSType.getRank() - 1);
+        if (K != 1)
+                return rewriter.notifyMatchFailure(contractOp, "K dim is not 1");
+
+
+        // Move the vector transfer read before the reduction and k loop
         rewriter.setInsertionPointAfter(subviewOp);
-        auto *cloneVectorReadOp = rewriter.clone(*retriveVectorReadOp);
+        auto *cloneVectorReadOp = rewriter.clone(*vectorReadOpAcc);
 
         // Code to re-create the reduction and k loop with iter args
-        auto *nextOp = (*cloneVectorReadOp).getNextNode();
-        auto oldReductionForOp = llvm::dyn_cast<mlir::scf::ForOp>(*nextOp);
-        auto oldKForOp = llvm::dyn_cast<mlir::scf::ForOp>(oldReductionForOp.getBody()->front());
-
         auto vectorReadOpValue = (*cloneVectorReadOp).getResult(0);
         rewriter.setInsertionPoint(oldReductionForOp);
 
