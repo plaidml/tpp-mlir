@@ -1,5 +1,5 @@
 //===-HoistVectorTransfers.cpp -----------------------------------------*-
-//C++-*-===//
+// C++-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -34,35 +34,11 @@ using namespace vector;
 namespace mlir {
 namespace tpp {
 
-enum class MatMulType { Standard, Batch, BatchReduce };
-
 struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
   using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
-
-    // Check whether the linalg tiling + vector contract pattern matches for the
-    // 4-nested loop structure
-    auto oldKForOp = contractOp->getParentOfType<scf::ForOp>();
-    if (!oldKForOp)
-      return rewriter.notifyMatchFailure(
-          contractOp, "Not a linalg tile + vector contract operation");
-
-    auto oldReductionForOp = oldKForOp->getParentOfType<scf::ForOp>();
-    if (!oldReductionForOp)
-      return rewriter.notifyMatchFailure(
-          contractOp, "Not a linalg tile + vector contract operation");
-
-    auto oldNForOp = oldReductionForOp->getParentOfType<scf::ForOp>();
-    if (!oldNForOp)
-      return rewriter.notifyMatchFailure(
-          contractOp, "Not a linalg tile + vector contract operation");
-
-    auto oldMForOp = oldNForOp->getParentOfType<scf::ForOp>();
-    if (!oldMForOp)
-      return rewriter.notifyMatchFailure(
-          contractOp, "Not a linalg tile + vector contract operation");
 
     // Check the vector contract operation satisfies the required pattern.
     // Check the ACC, LHS, and RHS of contract operation
@@ -88,41 +64,55 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
 
     // Check the operation type MatMul, B-MatMul, or BR-MatMul
     auto contractIteratorTypes = contractOp.getIteratorTypesArray();
-    MatMulType matmulType;
-
-    if (contractIteratorTypes.size() > 3) {
-      matmulType = contractIteratorTypes[contractIteratorTypes.size() - 4] ==
-                           vector::IteratorType::parallel
-                       ? MatMulType::Batch
-                       : MatMulType::BatchReduce;
-      if (matmulType == MatMulType::Batch)
-        return rewriter.notifyMatchFailure(
-            contractOp, "Batch matmul operation not supported yet");
-    } else if (contractIteratorTypes.size() == 3) {
-      matmulType = MatMulType::Standard;
-    } else {
-      return rewriter.notifyMatchFailure(
-          contractOp, "The vector contract operation is not a gemm");
+    size_t reductionCount = 0;
+    for (size_t i = 0; i < contractIteratorTypes.size(); i++) {
+      if (contractIteratorTypes[i] == vector::IteratorType::reduction)
+        reductionCount++;
     }
 
     auto vectorReadOpLHSType = cast<ShapedType>(vectorReadOpLHS.getType());
-    auto vectorReadOpRHSType = cast<ShapedType>(vectorReadOpRHS.getType());
+    auto vectorReadOpRHSRank =
+        (cast<ShapedType>(vectorReadOpRHS.getType())).getRank();
 
-    if (matmulType == MatMulType::BatchReduce &&
-        (vectorReadOpLHSType.getRank() != 3 ||
-         vectorReadOpRHSType.getRank() != 3))
+    if (reductionCount == 2 &&
+        (vectorReadOpLHSType.getRank() != 3 || vectorReadOpRHSRank != 3))
       return failure();
 
-    if (matmulType == MatMulType::Standard &&
-        (vectorReadOpLHSType.getRank() != 2 ||
-         vectorReadOpRHSType.getRank() != 2))
-      return failure();
+    if (reductionCount == 1)
+      return rewriter.notifyMatchFailure(
+          contractOp, "Batch matmul operation not supported yet");
+
+    if (reductionCount > 2)
+      return rewriter.notifyMatchFailure(
+          contractOp, "The vector contract operation is not a gemm");
 
     // Check the K-dim to be 1
     int64_t K =
         vectorReadOpLHSType.getDimSize(vectorReadOpLHSType.getRank() - 1);
     if (K != 1)
       return rewriter.notifyMatchFailure(contractOp, "K dim is not 1");
+
+    // Check whether the linalg tiling + vector contract pattern matches for the
+    // 4-nested loop structure
+    auto oldKForOp = contractOp->getParentOfType<scf::ForOp>();
+    if (!oldKForOp)
+      return rewriter.notifyMatchFailure(
+          contractOp, "Not a linalg tile + vector contract operation");
+
+    auto oldReductionForOp = oldKForOp->getParentOfType<scf::ForOp>();
+    if (!oldReductionForOp)
+      return rewriter.notifyMatchFailure(
+          contractOp, "Not a linalg tile + vector contract operation");
+
+    auto oldNForOp = oldReductionForOp->getParentOfType<scf::ForOp>();
+    if (!oldNForOp)
+      return rewriter.notifyMatchFailure(
+          contractOp, "Not a linalg tile + vector contract operation");
+
+    auto oldMForOp = oldNForOp->getParentOfType<scf::ForOp>();
+    if (!oldMForOp)
+      return rewriter.notifyMatchFailure(
+          contractOp, "Not a linalg tile + vector contract operation");
 
     // Move the vector transfer read before the reduction and k loop
     rewriter.setInsertionPoint(oldReductionForOp);
