@@ -45,10 +45,10 @@ getContractOperands(vector::ContractionOp contractOp) {
 }
 
 static FailureOr<SmallVector<memref::SubViewOp>>
-getReadOperands(SmallVector<vector::TransferReadOp> readOp) {
+getReadOperands(SmallVector<vector::TransferReadOp> readOps) {
   SmallVector<memref::SubViewOp> list;
-  for (int i = 0; i < 3; i++) {
-    auto subViewOp = readOp[i].getOperand(0).getDefiningOp<memref::SubViewOp>();
+  for (vector::TransferReadOp readOp : readOps) {
+    auto subViewOp = readOp.getOperand(0).getDefiningOp<memref::SubViewOp>();
     if (!subViewOp)
       return failure();
     list.push_back(subViewOp);
@@ -57,21 +57,10 @@ getReadOperands(SmallVector<vector::TransferReadOp> readOp) {
 }
 
 static FailureOr<SmallVector<scf::ForOp>>
-getNestedLoop(vector::ContractionOp contractOp,
-              SmallVector<memref::SubViewOp> subviews) {
-
-  auto subviewOpLhsOffsets = subviews[0].getOffsets();
-  auto subviewOpRhsOffsets = subviews[1].getOffsets();
-  auto subviewOpAccOffsets = subviews[2].getOffsets();
-
+getNestedLoop(vector::ContractionOp contractOp) {
   SmallVector<scf::ForOp> list;
   scf::ForOp current = contractOp->getParentOfType<scf::ForOp>();
   if (!current)
-    return failure();
-
-  // check the induction variable usage in subviews of vector read op
-  Value ivK = current.getInductionVar();
-  if (ivK != subviewOpLhsOffsets[2] || ivK != subviewOpRhsOffsets[1])
     return failure();
 
   list.push_back(current);
@@ -83,22 +72,33 @@ getNestedLoop(vector::ContractionOp contractOp,
     current = parent;
   }
 
-  // Check the induction variable usgae in subviews of vector read op for other
-  // loops
-  Value ivReduction = list[1].getInductionVar();
+  return list;
+}
+
+static LogicalResult checkNestedLoop(SmallVector<scf::ForOp> loops,
+                                     SmallVector<memref::SubViewOp> subviews) {
+  auto subviewOpLhsOffsets = subviews[0].getOffsets();
+  auto subviewOpRhsOffsets = subviews[1].getOffsets();
+  auto subviewOpAccOffsets = subviews[2].getOffsets();
+
+  Value ivK = loops[0].getInductionVar();
+  if (ivK != subviewOpLhsOffsets[2] || ivK != subviewOpRhsOffsets[1])
+    return failure();
+
+  Value ivReduction = loops[1].getInductionVar();
   if (ivReduction != subviewOpLhsOffsets[0] ||
       ivReduction != subviewOpRhsOffsets[0])
     return failure();
 
-  Value ivN = list[2].getInductionVar();
+  Value ivN = loops[2].getInductionVar();
   if (ivN != subviewOpAccOffsets[1] || ivN != subviewOpRhsOffsets[2])
     return failure();
 
-  Value ivM = list[3].getInductionVar();
+  Value ivM = loops[3].getInductionVar();
   if (ivM != subviewOpLhsOffsets[1] || ivM != subviewOpAccOffsets[0])
     return failure();
 
-  return list;
+  return success();
 }
 
 struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
@@ -115,24 +115,23 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(contractOp,
                                          "Invalid operands for contract op");
 
-    auto readOp = *operands;
-    auto vectorReadOpAcc = readOp[2];
-    auto vectorReadOpLhs = readOp[0];
-    auto vectorReadOpRhs = readOp[1];
+    auto readOps = *operands;
+    auto vectorReadOpAcc = readOps[2];
+    auto vectorReadOpLhs = readOps[0];
+    auto vectorReadOpRhs = readOps[1];
 
     // Check whether the operand of vector transfer read is a subview
-    auto subviews = getReadOperands(readOp);
+    auto subviews = getReadOperands(readOps);
     if (failed(subviews))
       return rewriter.notifyMatchFailure(
-          contractOp, "Vector read op operand(s) is/are not a subview");
+          contractOp, "Vector read op operands are not a subview");
 
     // Check the operation type MatMul, B-MatMul, or BR-MatMul
-    auto contractIteratorTypes = contractOp.getIteratorTypesArray();
-    size_t reductionCount = 0;
-    for (size_t i = 0; i < contractIteratorTypes.size(); i++) {
-      if (contractIteratorTypes[i] == vector::IteratorType::reduction)
-        reductionCount++;
-    }
+    SmallVector<vector::IteratorType> contractIteratorTypes =
+        contractOp.getIteratorTypesArray();
+    int reductionCount =
+        std::count(contractIteratorTypes.begin(), contractIteratorTypes.end(),
+                   vector::IteratorType::reduction);
 
     auto vectorReadOpLhsType = cast<ShapedType>(vectorReadOpLhs.getType());
     auto vectorReadOpRhsRank =
@@ -140,7 +139,8 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
 
     if (reductionCount == 2 &&
         (vectorReadOpLhsType.getRank() != 3 || vectorReadOpRhsRank != 3))
-      return failure();
+      return rewriter.notifyMatchFailure(
+          contractOp, "Invalid rank for batch reduce operation");
 
     if (reductionCount == 1)
       return rewriter.notifyMatchFailure(
@@ -158,10 +158,15 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
 
     // Check whether the linalg tiling + vector contract pattern matches for the
     // 4-nested loop structure
-    auto loops = getNestedLoop(contractOp, *subviews);
+    auto loops = getNestedLoop(contractOp);
     if (failed(loops))
       return rewriter.notifyMatchFailure(
           contractOp, "Invalid loop nest in contract pattern");
+
+    auto checkLoops = checkNestedLoop(*loops, *subviews);
+    if (failed(checkLoops))
+      return rewriter.notifyMatchFailure(
+          contractOp, "Loops doesn't match the iv in subviews");
 
     auto nestedLoops = *loops;
     auto kForOp = nestedLoops[0];
@@ -213,18 +218,15 @@ struct HoistVectorTransferOp : OpRewritePattern<vector::ContractionOp> {
         newcontractOpValue = vectorContractOp.getResult();
       }
       if (auto yieldOp = llvm::dyn_cast<scf::YieldOp>(op)) {
-        if (newcontractOpValue != NULL)
-          yieldOp.setOperand(0, newcontractOpValue);
+        yieldOp.setOperand(0, newcontractOpValue);
       }
       if (auto vectorWriteOp = llvm::dyn_cast<vector::TransferWriteOp>(op)) {
         vectorWriteOperation = vectorWriteOp;
       }
     }
 
-    if (vectorWriteOperation != NULL) {
-      vectorWriteOperation.setOperand(0, newReductionForOp.getResult(0));
-      vectorWriteOperation->moveBefore(reductionForOp);
-    }
+    vectorWriteOperation.setOperand(0, newReductionForOp.getResult(0));
+    vectorWriteOperation->moveBefore(reductionForOp);
 
     // Erase the old vector contract operation
     for (auto result : contractOp->getResults()) {
