@@ -60,7 +60,6 @@ static FailureOr<SmallVector<scf::ForOp>>
 getNestedLoop(vector::ContractionOp contractOp) {
   SmallVector<scf::ForOp> list;
   Operation *current = contractOp;
-
   for (int i = 0; i < 4; i++) {
     Operation *parent = current->getParentOfType<scf::ForOp>();
     if (!parent)
@@ -68,7 +67,6 @@ getNestedLoop(vector::ContractionOp contractOp) {
     list.push_back(dyn_cast<scf::ForOp>(parent));
     current = parent;
   }
-
   return list;
 }
 
