@@ -59,16 +59,13 @@ getReadOperands(SmallVector<vector::TransferReadOp> readOps) {
 static FailureOr<SmallVector<scf::ForOp>>
 getNestedLoop(vector::ContractionOp contractOp) {
   SmallVector<scf::ForOp> list;
-  scf::ForOp current = contractOp->getParentOfType<scf::ForOp>();
-  if (!current)
-    return failure();
+  Operation *current = contractOp;
 
-  list.push_back(current);
-  for (int i = 0; i < 3; i++) {
-    scf::ForOp parent = current->getParentOfType<scf::ForOp>();
+  for (int i = 0; i < 4; i++) {
+    Operation *parent = current->getParentOfType<scf::ForOp>();
     if (!parent)
       return failure();
-    list.push_back(parent);
+    list.push_back(dyn_cast<scf::ForOp>(parent));
     current = parent;
   }
 
