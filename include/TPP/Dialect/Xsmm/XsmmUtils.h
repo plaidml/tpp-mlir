@@ -11,7 +11,12 @@
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "TPP/IR/StructuredOpMatcher.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 namespace mlir {
 class Type;
@@ -60,6 +65,12 @@ namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
 
+FailureOr<UnaryInfo> getVectorUnaryInfo(MemRefType inputType,
+                                        MemRefType outputType,
+                                        VectorType inputVectorType,
+                                        VectorType outputVectorType,
+                                        UnaryFlags inputFlag);
+
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
                                   UnaryFlags inputFlag);
 
@@ -87,6 +98,25 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
 ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
+
+int64_t getOredFlags(ArrayAttr flags);
+
+SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
+                                            ValueRange operands);
+SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
+                               ValueRange operands, IntegerAttr dataTypeAttr);
+
+bool isTwoDTransposeOp(vector::TransposeOp transposeOp);
+
+func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
+                               ArrayRef<Value> dispatchOperands,
+                               ArrayRef<Type> dispatchOperandTypes,
+                               ModuleOp module, FlatSymbolRefAttr fnName);
+func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
+                             ModuleOp module, SmallVector<Value> inputOperands,
+                             SmallVector<Value> prependValues, int prependIndex,
+                             SmallVector<Value> operands, StringRef invokeName,
+                             DataTypeAttr dtype, bool getResults = false);
 
 template <typename DispatchOpTy>
 FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,

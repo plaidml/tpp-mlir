@@ -98,6 +98,8 @@ class XeGPUDialect;
 
 } // namespace mlir
 
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertTranspose.h"
+
 namespace mlir {
 namespace tpp {
 // TODO: This should be per-pass so that pass can live
