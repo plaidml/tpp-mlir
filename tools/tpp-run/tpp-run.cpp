@@ -147,10 +147,6 @@ llvm::cl::opt<bool>
                llvm::cl::desc("Kernel buffers are allocated on GPU"),
                llvm::cl::init(true));
 
-llvm::cl::opt<bool> defVectorToXSMM("vector-to-xsmm",
-                                    llvm::cl::desc("Vector to XSMM lowering"),
-                                    llvm::cl::init(false));
-
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers
 static LogicalResult prepareMLIRKernel(Operation *op,

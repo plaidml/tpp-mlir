@@ -39,8 +39,9 @@ func::FuncOp createFunction(OpBuilder &builder, ModuleOp module, StringRef name,
   auto unkLoc = builder.getUnknownLoc();
   auto funcType = FunctionType::get(builder.getContext(), args, ret);
   auto func = func::FuncOp::create(unkLoc, name, funcType);
-  func.setVisibility(SymbolTable::Visibility::Public);
+  func.setVisibility(SymbolTable::Visibility::Private);
   if (createBody) {
+    func.setVisibility(SymbolTable::Visibility::Public);
     auto *entryBlock = func.addEntryBlock();
     builder.setInsertionPointToEnd(entryBlock);
   }

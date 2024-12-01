@@ -76,6 +76,10 @@ llvm::cl::list<unsigned>
                      llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
                      llvm::cl::CommaSeparated);
 
+llvm::cl::opt<bool> vectorToXSMM("vector-to-XSMM",
+                                   llvm::cl::desc("Lower vector to XSMM"),
+                                   llvm::cl::init(false));
+
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_DEFAULTPIPELINE
@@ -151,6 +155,7 @@ private:
           tppDefaultOptions.linalgToLoops = linalgToLoops;
 	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
 	  tppDefaultOptions.linalgToVector = linalgToVector;
+          tppDefaultOptions.vectorToXSMM = vectorToXSMM;
           tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
 	  tppDefaultOptions.lhsTile = lhsTile;
 	  tppDefaultOptions.rhsTile = rhsTile;

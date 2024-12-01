@@ -1,5 +1,6 @@
-// RUN: tpp-run --vector-To-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
 // RUN: tpp-run --linalg-to-loops %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=mid 2>&1 | FileCheck %s --check-prefix=XSMM
 
 module {
   func.func @entry(%arg0: tensor<3x5xf32>, %arg1: tensor<5x3xf32>)->tensor<5x3xf32> {
@@ -7,6 +8,11 @@ module {
     return %out: tensor<5x3xf32>
   }
 }
+
+
+// XSMM: call @xsmm_unary_dispatch
+// XSMM: call @xsmm_unary_invoke
+
 // CHECK: ( 0, 0.298506, 0 )
 // CHECK: ( 0.130352, 0.0983867, 0.0499509 )
 // CHECK: ( 0.151291, 0.011257, 0.129232 )

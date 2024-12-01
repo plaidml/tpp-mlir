@@ -11,11 +11,7 @@
 
 #include "TPP/Dialect/Xsmm/XsmmEnum.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
-#include "TPP/IR/StructuredOpMatcher.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include <variant>
 
 namespace mlir {
 class Type;
@@ -23,6 +19,13 @@ class RewriterBase;
 class Value;
 class ArrayAttr;
 class Operation;
+class PatternRewriter;
+class VectorType;
+class MemRefType;
+
+namespace func {
+class CallOp;
+}
 
 namespace xsmm {
 class UnaryKindAttr;
@@ -64,11 +67,10 @@ namespace utils {
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type);
 
-FailureOr<UnaryInfo> getVectorUnaryInfo(MemRefType inputType,
-                                        MemRefType outputType,
-                                        VectorType inputVectorType,
-                                        VectorType outputVectorType,
-                                        UnaryFlags inputFlag);
+FailureOr<UnaryInfo>
+getVectorUnaryInfo(MemRefType shapeType, MemRefType inputType,
+                   MemRefType outputType, VectorType inputVectorType,
+                   VectorType outputVectorType, UnaryFlags inputFlag);
 
 FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
                                   UnaryFlags inputFlag);
@@ -96,19 +98,30 @@ ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
 
-bool isTwoDTransposeOp(vector::TransposeOp transposeOp);
-
 template <typename DispatchOpTy>
 FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
                                                  DispatchOpTy dispatchOpTy,
                                                  bool returnNone);
+
 SmallVector<Type> extractOperandTypes(OpBuilder &builder,
                                       ArrayRef<Value> operands);
 
-func::CallOp buildXsmmCall(RewriterBase &rewriter, Location loc,
-                           DataTypeAttr dtype, ValueRange operands,
-                           TypeRange results, ModuleOp module,
-                           FlatSymbolRefAttr fnName, Operation *insertBefore);
+enum class XsmmCallType { DISPATCH = 0, INVOKE = 1 };
+
+typedef struct {
+  XsmmCallType CallType;
+  Value CallResult;
+} XsmmCall;
+
+// This is Value type and not MemRefType only in case we want to support some
+// other object types in the future
+typedef std::variant<int64_t, Value, XsmmCall> XsmmOperand;
+
+func::CallOp buildXsmmCall(RewriterBase &rewriter, XsmmCallType callType,
+                           Location loc, DataTypeAttr dtype,
+                           SmallVector<XsmmOperand> operands, TypeRange results,
+                           FlatSymbolRefAttr fnName, Operation *parentOp,
+                           Operation *insertBefore);
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

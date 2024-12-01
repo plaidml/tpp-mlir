@@ -51,7 +51,8 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     ListOption<"lhsTile", "lhsTile",
            "unsigned", "Lhs tile size for brgemm operation.">,
     ListOption<"rhsTile", "rhsTile",
-           "unsigned", "Rhs tile size for brgemm operation.">
+           "unsigned", "Rhs tile size for brgemm operation.">,
+
   ];
 }
 
@@ -86,9 +87,9 @@ def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
 def VectorToXSMM : Pass<"vector-to-xsmm", "ModuleOp"> {
   let summary = "Lower Vector operations to XSMM functions.";
   let dependentDialects = ["scf::SCFDialect",
-			   "mlir::pdl::PDLDialect",
-			   "mlir::pdl_interp::PDLInterpDialect",
-                    	   "mlir::vector::VectorDialect", 
+			   "pdl::PDLDialect",
+			   "pdl_interp::PDLInterpDialect",
+                    	   "vector::VectorDialect", 
 			   "func::FuncDialect",
                     	   "memref::MemRefDialect", 
 			   "LLVM::LLVMDialect", 

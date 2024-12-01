@@ -10,7 +10,6 @@
 #define TPP_TRANSFORMS_UTILS_VNNIUTILS_H
 
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include <cstdint>
 #include <optional>
 
@@ -20,6 +19,7 @@ class MemRefType;
 class OpOperand;
 class AffineDimExpr;
 class AffineMap;
+class VectorType;
 
 namespace linalg {
 class GenericOp;

@@ -13,23 +13,15 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
 #include "TPP/Transforms/Utils/BuilderUtils.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SetOperations.h"
-#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-#include <map>
 #define DEBUG_TYPE "xsmm-utils"
-
-using namespace mlir::linalg;
-using namespace mlir::structured_match;
 
 namespace mlir {
 namespace xsmm {
@@ -64,8 +56,9 @@ computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
     else if ((lowerRankDim > 1 && higherRankDim == 1) ||
              (lowerRankDim == higherRankDim)) {
       reshapeOutputShape[i] = lowerRankDim;
-    } else if (higherRankDim != lowerRankDim)
-      assert(false && "bCast semantics for identity op broken");
+    } else if (higherRankDim != lowerRankDim) {
+      llvm_unreachable("bCast semantics for identity op broken");
+    }
   }
 }
 
@@ -140,59 +133,48 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   return unaryInfo;
 }
 
-FailureOr<UnaryInfo> getVectorUnaryInfo(MemRefType inputType,
-                                        MemRefType outputType,
-                                        VectorType inputVectorType,
-                                        VectorType outputVectorType,
-                                        UnaryFlags inputFlag) {
-  if (!outputVectorType.hasStaticShape() ||
-      !isa<FloatType>(outputVectorType.getElementType())) {
-    return failure();
-  }
+FailureOr<UnaryInfo>
+getVectorUnaryInfo(MemRefType shapedType, MemRefType inputType,
+                   MemRefType outputType, VectorType inputVectorType,
+                   VectorType outputVectorType, UnaryFlags inputFlag) {
 
   UnaryInfo unaryInfo;
-  unaryInfo.m = 1;
-  for (size_t i = 0; i < outputVectorType.getShape().size() - 1; i++) {
-    unaryInfo.m *= outputVectorType.getShape()[i];
-  }
-  unaryInfo.n =
-      outputVectorType.getShape()[outputVectorType.getShape().size() - 1];
-  int ldo = 1;
 
-  SmallVector<int64_t> strides;
-  int64_t offset;
-  SmallVector<int64_t> bShapeInput;
-  computeBcastShapeInput(inputType.getShape(), inputVectorType.getShape(),
-                         bShapeInput);
-  auto memrefType = MemRefType::get(bShapeInput, inputType.getElementType());
-  if (failed(getStridesAndOffset(memrefType, strides, offset)))
+  unaryInfo.m = shapedType.getShape()[0];
+  unaryInfo.n = shapedType.getShape()[1];
+
+  auto getStrideLoc = [&](MemRefType inputType) -> FailureOr<int64_t> {
+    int64_t strideAtLoc;
+    SmallVector<int64_t> strides;
+    int64_t offset;
+
+    if (failed(getStridesAndOffset(inputType, strides, offset)))
+      return failure();
+    strideAtLoc = strides[0];
+    return strideAtLoc;
+  };
+
+  auto strideLdi = getStrideLoc(inputType);
+  if (failed(strideLdi))
     return failure();
-  ldo = strides[0];
-
-  unaryInfo.ldo = ldo;
-  int ldi = 1;
+  unaryInfo.ldi = *strideLdi;
+  int ldo = 1;
   // If we are broascasting a row into cols, the leading
   // dimension is 1, same for scalar broadcast.
   if (inputFlag == UnaryFlags::BCAST_ROW ||
-      inputFlag == UnaryFlags::BCAST_SCALAR) {
-    ldi = 1;
-  } // If we are broascasting a col into rows, the leading
+      inputFlag == UnaryFlags::BCAST_SCALAR)
+    ldo = 1;
+  // If we are broascasting a col into rows, the leading
   // dimension is the size of the tensor.
-  else if (inputFlag == UnaryFlags::BCAST_COL) {
-    ldi = inputVectorType.getShape()[0];
-  } else {
-    SmallVector<int64_t> strides;
-    int64_t offset;
-    SmallVector<int64_t> bShapeInput;
-    computeBcastShapeInput(outputType.getShape(), outputVectorType.getShape(),
-                           bShapeInput);
-    auto memrefType =
-        MemRefType::get(bShapeInput, outputVectorType.getElementType());
-    if (failed(getStridesAndOffset(memrefType, strides, offset)))
+  else if (inputFlag == UnaryFlags::BCAST_COL)
+    ldo = inputVectorType.getShape()[0];
+  else {
+    auto strideLdo = getStrideLoc(outputType);
+    if (failed(strideLdo))
       return failure();
-    ldi = strides[0];
+    ldo = *strideLdo;
   }
-  unaryInfo.ldi = ldi;
+  unaryInfo.ldo = ldo;
   return unaryInfo;
 }
 
@@ -317,6 +299,7 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   computeBcastShapeInput(shapeOutput, shapeOperand, bOperandShape);
   assert(shapeOutput.size() == bOperandShape.size());
   assert(shapeOutput.size() == 2);
+
   auto getBCastEnum = [](BCastType bCastType,
                          OperandPos operandPos) -> xsmm::BinaryFlags {
     switch (bCastType) {
@@ -358,75 +341,84 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   return failure();
 }
 
-bool isTwoDTransposeOp(vector::TransposeOp transposeOp) {
-  auto operandType = dyn_cast<VectorType>(transposeOp.getOperand().getType());
-  bool isVnni = vnni::utils::isInVnniLayout(operandType.getRank(), operandType);
-  if (isVnni || operandType.getRank() != 2 ||
-      dyn_cast<VectorType>(transposeOp.getResult().getType()).getRank() != 2)
-    return false;
-  return true;
-}
-
-SmallVector<Type> extractOperandTypes(OpBuilder &builder, ValueRange operands) {
+SmallVector<Type> extractOperandTypes(OpBuilder &builder,
+                                      SmallVector<XsmmOperand> operands) {
   SmallVector<Type> results;
-  // One extra operand for datatype
-  for (Value operand : operands) {
-    Type operandType = operand.getType();
-    if (auto memrefType = isa<MemRefType>(operandType)) {
-      // TODO: non-POD will require an LLVMTypeConverter.
-      Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
-      results.push_back(basePtrType);
-      results.push_back(builder.getIndexType()); // offset
-    } else {
-      results.push_back(operandType);
+  for (XsmmOperand operand : operands) {
+    if (std::holds_alternative<int64_t>(operand))
+      results.push_back(IntegerType::get(builder.getContext(), 64));
+    else if (std::holds_alternative<Value>(operand)) {
+      Value valueOperand = std::get<Value>(operand);
+      if (isa<MemRefType>(valueOperand.getType())) {
+        Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
+        results.push_back(basePtrType);
+        results.push_back(builder.getIndexType()); // offset
+      }
+    } else if (std::holds_alternative<XsmmCall>(operand)) {
+      XsmmCall callOperand = std::get<XsmmCall>(operand);
+      if (callOperand.CallType == XsmmCallType::DISPATCH) {
+        results.push_back(callOperand.CallResult.getType());
+      } else {
+        llvm_unreachable("Unknown XSMM function type");
+      }
     }
   }
   return results;
 }
 
-static SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
-                                      ValueRange operands,
-                                      IntegerAttr dataTypeAttr,
-                                      Operation *parentOp) {
+SmallVector<Value> getXsmmOperands(OpBuilder &builder, Location loc,
+                                   SmallVector<XsmmOperand> operands,
+                                   IntegerAttr dataTypeAttr,
+                                   Operation *parentOp) {
   SmallVector<Value> res;
-  builder.setInsertionPoint(parentOp);
-  for (Value operand : operands) {
-    auto memrefType = dyn_cast<MemRefType>(operand.getType());
-    if (!memrefType) {
-      res.push_back(operand);
-      continue;
+  for (XsmmOperand operand : operands) {
+    if (std::holds_alternative<int64_t>(operand))
+      res.push_back(getConstInt(builder, std::get<int64_t>(operand), 64));
+    else if (std::holds_alternative<Value>(operand)) {
+      Value valueOperand = std::get<Value>(operand);
+      if (isa<MemRefType>(valueOperand.getType())) {
+        auto [ptr, offset] = ::mlir::utils::getPtrAndOffset(
+            builder, std::get<Value>(operand), loc);
+        res.push_back(ptr);
+        res.push_back(offset);
+      }
+    } else if (std::holds_alternative<XsmmCall>(operand)) {
+      XsmmCall callOperand = std::get<XsmmCall>(operand);
+      if (callOperand.CallType == XsmmCallType::DISPATCH) {
+        res.push_back(callOperand.CallResult);
+      } else {
+        llvm_unreachable("Unknown XSMM function type");
+      }
     }
-    auto [ptr, offset] = ::mlir::utils::getPtrAndOffset(builder, operand, loc);
-    res.push_back(ptr);
-    res.push_back(offset);
   }
   return res;
 }
 
-func::CallOp buildXsmmCall(RewriterBase &rewriter, Location loc,
-                           DataTypeAttr dtype, ValueRange operands,
-                           TypeRange results, ModuleOp module,
-                           FlatSymbolRefAttr fnName, Operation *insertBefore) {
-  auto operandTypes = xsmm::utils::extractOperandTypes(rewriter, operands);
-  func::FuncOp funcOp = createFunction(rewriter, module, fnName.getValue(),
-                                       operandTypes, results, false);
-  funcOp.setPrivate();
+func::CallOp buildXsmmCall(RewriterBase &rewriter, XsmmCallType callType,
+                           Location loc, DataTypeAttr dtype,
+                           SmallVector<XsmmOperand> operands, TypeRange results,
+                           FlatSymbolRefAttr fnName, Operation *parentOp,
+                           Operation *insertBefore) {
+  auto module = parentOp->getParentOfType<ModuleOp>();
+  OpBuilder::InsertionGuard guard(rewriter);
 
-  func::CallOp call;
-  //  if (insertAfter) {
-  //  rewriter.setInsertionPointAfter(insertAfter);
-  if (insertBefore) {
+  auto operandTypes = xsmm::utils::extractOperandTypes(rewriter, operands);
+  createFunction(rewriter, module, fnName.getValue(), operandTypes, results,
+                 false);
+  if (callType == XsmmCallType::INVOKE) {
+    assert(insertBefore != NULL);
     rewriter.setInsertionPoint(insertBefore);
-    auto finalOperands = xsmm::utils::getOperands(
-        rewriter, insertBefore->getLoc(), operands, dtype, insertBefore);
-    call = rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
-                                         finalOperands);
+  } else if (callType == XsmmCallType::DISPATCH) {
+    auto functionOp = parentOp->getParentOfType<func::FuncOp>();
+    rewriter.setInsertionPointAfter(&*functionOp.getBlocks().begin()->begin());
   } else {
-    call = rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
-                                         operands);
+    llvm_unreachable("Unknown XSMM function type");
   }
-  module.dump();
-  return call;
+
+  SmallVector<Value> finalOperands =
+      xsmm::utils::getXsmmOperands(rewriter, loc, operands, dtype, parentOp);
+  return rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
+                                       finalOperands);
 }
 
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {

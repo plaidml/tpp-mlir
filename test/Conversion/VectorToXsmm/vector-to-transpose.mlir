@@ -59,13 +59,13 @@ func.func @vnni_packing_2d_bf16(%arg0: memref<32x32xbf16, strided<[512, 1], offs
 // CHECK-DAG: %[[c512_i64:.*]] = arith.constant 512 : i64
 // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // CHECK: %[[dispatch:.*]] = call @xsmm_unary_dispatch(%[[c28_i64]], %[[c2_i64]], %[[c32_i64]], %[[c32_i64]], %[[c512_i64]], %[[c32_i64]], %[[c0_i64]])
-// CHECK: %[[expand_shape:.*]] = memref.expand_shape %[[arg0]] {{\[}}[0, 1], [2]] output_shape [16, 2, 32]
-// CHECK: %[[base_buffer:.*]], %[[offset:.*]], %[[sizes:.*]]:3, %[[strides:.*]]:3 = memref.extract_strided_metadata %expand_shape
-// CHECK-DAG:  %[[intptr:.*]] = memref.extract_aligned_pointer_as_index %[[expand_shape]]
+// CHECK-DAG: %[[expand_shape:.*]] = memref.expand_shape %[[arg0]] {{\[}}[0, 1], [2]] output_shape [16, 2, 32]
+// CHECK-NEXT: %[[base_buffer:.*]], %[[offset:.*]], %[[sizes:.*]]:3, %[[strides:.*]]:3 = memref.extract_strided_metadata %expand_shape
+// CHECK-NEXT:  %[[intptr:.*]] = memref.extract_aligned_pointer_as_index %[[expand_shape]]
 // CHECK-NEXT: %[[indexCast1:.*]] = arith.index_cast %[[intptr]]
 // CHECK-NEXT: %[[inttoptr:.*]] = llvm.inttoptr %[[indexCast1]]
-// CHECK: %[[base_buffer_0:.*]], %[[offset_1:.*]], %[[sizes_2:.*]]:3, %[[strides_3:.*]]:3 = memref.extract_strided_metadata %[[arg1]]
-// CHECK-DAG:  %[[intptr0:.*]] = memref.extract_aligned_pointer_as_index %[[arg1]]
+// CHECK-DAG: %[[base_buffer_0:.*]], %[[offset_1:.*]], %[[sizes_2:.*]]:3, %[[strides_3:.*]]:3 = memref.extract_strided_metadata %[[arg1]]
+// CHECK-NEXT: %[[intptr0:.*]] = memref.extract_aligned_pointer_as_index %[[arg1]]
 // CHECK-NEXT: %[[indexCast2:.*]] = arith.index_cast %[[intptr0]]
 // CHECK-NEXT: %[[inttoptr2:.*]] = llvm.inttoptr %[[indexCast2]]
 // CHECK:   call @xsmm_unary_invoke(%[[c2_i64]], %[[dispatch]], %[[inttoptr]], %[[offset]], %[[inttoptr2]], %[[offset_1]])
@@ -112,18 +112,18 @@ func.func @vnni_packing_2d_bf16_forall(%arg0: memref<128x128xbf16>, %arg1: memre
 // CHECK-DAG: %[[c0_i64:.*]] = arith.constant 0 : i64
 // CHECK: %[[dispatch:.*]] = call @xsmm_unary_dispatch(%[[c28_i64]], %[[c2_i64]], %[[c32_i64]], %[[c32_i64]], %[[c128_i64]], %[[c32_i64]], %[[c0_i64]])
 // CHECK: scf.forall (%[[arg2:.*]], %[[arg3:.*]]) in (4, 4) {
-// CHECK:      %[[par1:.*]] = affine.apply #map(%[[arg3]])
-// CHECK:      %[[par2:.*]] = affine.apply #map(%[[arg2]])
-// CHECK:      %[[subview:.*]] = memref.subview %[[arg0]][%[[par1]], %[[par2]]] [32, 32] [1, 1]
-// CHECK:      %[[subview_0:.*]] = memref.subview %[[arg1]][%[[arg2]], %[[arg3]], 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1]
-// CHECK:      %[[expand_shape]] = memref.expand_shape %[[subview]] {{\[}}[0, 1], [2]] output_shape [16, 2, 32]
-// CHECK:      %[[base_buffer:.*]], %[[offset:.*]], %[[sizes:.*]]:3, %[[strides:.*]]:3 = memref.extract_strided_metadata %expand_shape
+// CHECK-DAG:      %[[par1:.*]] = affine.apply #map(%[[arg3]])
+// CHECK-DAG:      %[[par2:.*]] = affine.apply #map(%[[arg2]])
+// CHECK-NEXT:      %[[subview:.*]] = memref.subview %[[arg0]][%[[par1]], %[[par2]]] [32, 32] [1, 1]
+// CHECK-DAG:      %[[subview_0:.*]] = memref.subview %[[arg1]][%[[arg2]], %[[arg3]], 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1]
+// CHECK:   %[[expand_shape:.*]] = memref.expand_shape %[[subview]] {{\[}}[0, 1], [2]] output_shape [16, 2, 32]
+// CHECK-DAG:  %[[base_buffer:.*]], %[[offset:.*]], %[[sizes:.*]]:3, %[[strides:.*]]:3 = memref.extract_strided_metadata %[[expand_shape]]
 // CHECK-DAG:  %[[intptr:.*]] = memref.extract_aligned_pointer_as_index %[[expand_shape]]
 // CHECK-NEXT: %[[indexCast1:.*]] = arith.index_cast %[[intptr]]
 // CHECK-NEXT: %[[inttoptr:.*]] = llvm.inttoptr %[[indexCast1]]
-// CHECK: %[[base_buffer_0:.*]], %[[offset_1:.*]], %[[sizes_2:.*]]:3, %[[strides_3:.*]]:3 = memref.extract_strided_metadata %[[subview_0]]
-// CHECK-DAG:  %[[intptr0:.*]] = memref.extract_aligned_pointer_as_index %[[subview_0]]
+// CHECK-DAG: %[[base_buffer_0:.*]], %[[offset_1:.*]], %[[sizes_2:.*]]:3, %[[strides_3:.*]]:3 = memref.extract_strided_metadata %[[subview_0]]
+// CHECK-NEXT:  %[[intptr0:.*]] = memref.extract_aligned_pointer_as_index %[[subview_0]]
 // CHECK-NEXT: %[[indexCast2:.*]] = arith.index_cast %[[intptr0]]
 // CHECK-NEXT: %[[inttoptr2:.*]] = llvm.inttoptr %[[indexCast2]]
-// CHECK:   call @xsmm_unary_invoke(%[[c2_i64]], %[[dispatch]], %[[inttoptr]], %[[offset]], %[[inttoptr2]], %[[offset_1]])
+// CHECK:   func.call @xsmm_unary_invoke(%[[c2_i64]], %[[dispatch]], %[[inttoptr]], %[[offset]], %[[inttoptr2]], %[[offset_1]])
 

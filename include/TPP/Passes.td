@@ -54,8 +54,10 @@ def VectorizationPass : Pass<"vectorization-pass",
     Vectorization pass to convert linalg to memref/vector instead of Xsmm.
   }];
 
-  let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "mlir::vector::VectorDialect" ];
+  let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "vector::VectorDialect" ];
 }
+
+
 
 def HoistVectorTransfers : Pass<"hoist-vector-transfer"> {
   let summary = "Hoist vector transfer operation outside of reduction and k loop";
@@ -73,7 +75,7 @@ def VectorContractToOuterproduct : Pass<
   let dependentDialects = ["memref::MemRefDialect",
                            "scf::SCFDialect",
                            "tensor::TensorDialect",
-                           "mlir::vector::VectorDialect"];
+                           "vector::VectorDialect"];
 }
 
 def VectorContractToFMA : Pass<
@@ -82,7 +84,7 @@ def VectorContractToFMA : Pass<
   let dependentDialects = ["memref::MemRefDialect",
                            "scf::SCFDialect",
                            "tensor::TensorDialect",
-                           "mlir::vector::VectorDialect",
+                           "vector::VectorDialect",
                            "arith::ArithDialect"];
 }
 
@@ -482,7 +484,7 @@ def TppRunnerWrapper : Pass<"tpp-runner-wrapper", "ModuleOp">{
                            "gpu::GPUDialect",
                            "arith::ArithDialect",
                            "scf::SCFDialect",
-                           "mlir::vector::VectorDialect",
+                           "vector::VectorDialect",
                            "bufferization::BufferizationDialect",
                            "perf::PerfDialect"];
   let options = [
@@ -531,7 +533,7 @@ def LinalgToXeGPU : Pass<"linalg-to-xegpu", "func::FuncOp"> {
                            "memref::MemRefDialect",
                            "arith::ArithDialect",
                            "math::MathDialect",
-                           "mlir::vector::VectorDialect"];
+                           "vector::VectorDialect"];
   let options = [
     Option<"kTile", "k-tile", "int64_t",
            /*default=*/"32",
@@ -585,7 +587,7 @@ def GpuVectorize : Pass<"gpu-vectorize", "ModuleOp"> {
                            "tensor::TensorDialect",
                            "math::MathDialect",
                            "arith::ArithDialect",
-                           "mlir::vector::VectorDialect"];
+                           "vector::VectorDialect"];
 }
 
 #endif // TPP_DIALECT_TPP_PASSES

@@ -90,8 +90,10 @@ private:
     if (linalgToVector) {
       skipOperations.push_back("all");
     }
-    if (vectorToXSMM)
-      skipOperations.clear();
+    if (vectorToXSMM) {
+      skipOperations.push_back("transpose");
+      skipOperations.push_back("vnni");
+    }
     if (vectorToKernel)
       skipOperations.clear();
 
