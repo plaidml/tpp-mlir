@@ -1,5 +1,6 @@
-// RUN: tpp-run --vector-To-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --vector-to-xsmm %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
 // RUN: tpp-run --linalg-to-loops %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --vector-to-xsmm %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s --check-prefix=XSMM
 
 func.func @entry(%arg0 : tensor<32x32xbf16>, %arg1 : tensor<16x32x2xbf16>)-> tensor<16x32x2xbf16> {
   %expand_shape = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape[16, 2, 32]
@@ -9,6 +10,10 @@ func.func @entry(%arg0 : tensor<32x32xbf16>, %arg1 : tensor<16x32x2xbf16>)-> ten
     outs(%arg1 : tensor<16x32x2xbf16>) permutation = [0, 2, 1]
   return %retval: tensor<16x32x2xbf16>
 }
+
+// XSMM: call @xsmm_unary_dispatch
+// XSMM: call @xsmm_unary_invoke
+
 
 // CHECK:	( 0, 0.186523 )
 // CHECK:	( 0.129883, 0.111816 )

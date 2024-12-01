@@ -70,7 +70,7 @@ FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
 }
 
 bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
-  return isInVnniLayout((int64_t)expectedRank, vector);
+  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector);
 }
 
 bool isInVnniLayout(int64_t expectedRank, VectorType vector) {

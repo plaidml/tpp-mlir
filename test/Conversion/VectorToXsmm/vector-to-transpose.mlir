@@ -1,6 +1,6 @@
-// RUN: tpp-opt --vector-to-xsmm %s --split-input-file | FileCheck %s
+// RUN: tpp-opt --vector-to-xsmm  %s --split-input-file | FileCheck %s
 
-func.func @transpose_op_0(%arg0: memref<3x5xf32>, %arg1: memref<5x3xf32>) {
+func.func @transpose_op_2d_f32(%arg0: memref<3x5xf32>, %arg1: memref<5x3xf32>) {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = vector.transfer_read %arg0[%c0, %c0], %cst {in_bounds = [true, true]} : memref<3x5xf32>, vector<3x5xf32>
@@ -9,7 +9,7 @@ func.func @transpose_op_0(%arg0: memref<3x5xf32>, %arg1: memref<5x3xf32>) {
     return
 }
 
-// CHECK-LABEL: func.func @transpose_op_0(
+// CHECK-LABEL: func.func @transpose_op_2d_f32(
 // CHECK: %[[arg0:.*]]: memref<3x5xf32>, %[[arg1:.*]]: memref<5x3xf32>) {
 // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
 // CHECK-DAG: %[[c29_i64:.*]] = arith.constant 29 : i64
@@ -27,7 +27,7 @@ func.func @transpose_op_0(%arg0: memref<3x5xf32>, %arg1: memref<5x3xf32>) {
 // CHECK:   call @xsmm_unary_invoke(%[[c1_i64]], %[[dispatch]], %[[inttoptr]], %[[c0]], %[[inttoptr2]], %[[c0]])
 
 // -----
-func.func @transpose_op_1(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
+func.func @transpose_op_3d_f32(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = vector.transfer_read %arg0[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<5x3x5xf32>, vector<5x3x5xf32>
@@ -35,13 +35,13 @@ func.func @transpose_op_1(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32>) {
     vector.transfer_write %1, %arg1[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<5x5x3xf32>, memref<5x5x3xf32>
     return
 }
-// CHECK-LABEL: func.func @transpose_op_1(
+// CHECK-LABEL: func.func @transpose_op_3d_f32(
 // CHECK: %[[arg0:.*]]: memref<5x3x5xf32>, %[[arg1:.*]]: memref<5x5x3xf32>) {
 // CHECK-NOT: call @xsmm_unary_dispatch
 // CHECK-NOT: call @xsmm_unary_invoke
 
 // -----
-func.func @vnni_packing_0(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
+func.func @vnni_packing_2d_bf16(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
     %cst = arith.constant 0.000000e+00 : bf16
     %c0 = arith.constant 0 : index
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xbf16, strided<[512, 1], offset: ?>> into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
@@ -51,7 +51,7 @@ func.func @vnni_packing_0(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>
     return
 }
 
-// CHECK-LABEL: func.func @vnni_packing_0(
+// CHECK-LABEL: func.func @vnni_packing_2d_bf16(
 // CHECK: %[[arg0:.*]]: memref<32x32xbf16, strided<[512, 1], offset: ?>>, %[[arg1:.*]]: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
 // CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
 // CHECK-DAG: %[[c2_i64:.*]] = arith.constant 2 : i64
@@ -71,7 +71,7 @@ func.func @vnni_packing_0(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>
 // CHECK:   call @xsmm_unary_invoke(%[[c2_i64]], %[[dispatch]], %[[inttoptr]], %[[offset]], %[[inttoptr2]], %[[offset_1]])
 
 // -----
-func.func @not_vnni_packing_1(%arg0: memref<32x32xf32, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
+func.func @not_vnni_packing_2d_f32(%arg0: memref<32x32xf32, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xf32, strided<[512, 1], offset: ?>> into memref<16x2x32xf32, strided<[1024, 512, 1], offset: ?>>
@@ -80,14 +80,14 @@ func.func @not_vnni_packing_1(%arg0: memref<32x32xf32, strided<[512, 1], offset:
     vector.transfer_write %1, %arg1[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x32x2xf32>, memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>
     return
 }
-// CHECK-LABEL: func.func @not_vnni_packing_1(
+// CHECK-LABEL: func.func @not_vnni_packing_2d_f32(
 // CHECK: %[[arg0:.*]]: memref<32x32xf32, strided<[512, 1], offset: ?>>, %[[arg1:.*]]: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
 // CHECK-NOT: call @xsmm_unary_dispatch
 // CHECK-NOT: call @xsmm_unary_invoke
 
 // -----
 #map = affine_map<(d0) -> (d0 * 32)>
-func.func @vnni_packing_1(%arg0: memref<128x128xbf16>, %arg1: memref<4x4x16x32x2xbf16>) {
+func.func @vnni_packing_2d_bf16_forall(%arg0: memref<128x128xbf16>, %arg1: memref<4x4x16x32x2xbf16>) {
     %cst = arith.constant 0.000000e+00 : bf16
     %c0 = arith.constant 0 : index
     scf.forall (%arg2, %arg3) in (4, 4) {
@@ -103,7 +103,7 @@ func.func @vnni_packing_1(%arg0: memref<128x128xbf16>, %arg1: memref<4x4x16x32x2
     return
 }
 
-// CHECK-LABEL: func.func @vnni_packing_1(
+// CHECK-LABEL: func.func @vnni_packing_2d_bf16_forall(
 // CHECK: %[[arg0:.*]]: memref<128x128xbf16>, %[[arg1:.*]]: memref<4x4x16x32x2xbf16>) {
 // CHECK-DAG: %[[c28_i64:.*]] = arith.constant 28 : i64
 // CHECK-DAG: %[[c2_i64:.*]] = arith.constant 2 : i64

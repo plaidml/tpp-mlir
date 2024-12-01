@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -57,6 +58,6 @@ struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
 private:
   void constructPipeline() override {
     LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-xsmm passes\n");
-    pm.addPass(createInsertTranspose());
+    pm.addPass(createConvertVectorToXsmm());
   }
 };

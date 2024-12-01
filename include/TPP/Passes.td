@@ -57,19 +57,6 @@ def VectorizationPass : Pass<"vectorization-pass",
   let dependentDialects = [ "memref::MemRefDialect", "linalg::LinalgDialect", "mlir::vector::VectorDialect" ];
 }
 
-def InsertTranspose : Pass<"insert-transpose-pass", "func::FuncOp"> {
-  let summary = "Insert transpose before gemm/brgemm and convert to xsmm";
-  let description = [{
-    Insert transpose before gemm or brgemm and convert to xsmm.
-  }];
-  let dependentDialects = ["func::FuncDialect",
-                           "memref::MemRefDialect",
-                           "mlir::vector::VectorDialect",
-                           "LLVM::LLVMDialect"];
-}
-
-
-
 def HoistVectorTransfers : Pass<"hoist-vector-transfer"> {
   let summary = "Hoist vector transfer operation outside of reduction and k loop";
   let description = [{

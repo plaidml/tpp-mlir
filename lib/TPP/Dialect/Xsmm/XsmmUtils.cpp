@@ -20,15 +20,16 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
+#include "TPP/Transforms/Utils/BuilderUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
 #include <map>
 #define DEBUG_TYPE "xsmm-utils"
 
-using namespace mlir;
 using namespace mlir::linalg;
-using namespace structured_match;
+using namespace mlir::structured_match;
 
 namespace mlir {
 namespace xsmm {
@@ -357,44 +358,36 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   return failure();
 }
 
-FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
-  // Not shaped type, the leading dimension is the single scalar.
-  auto memref = dyn_cast<MemRefType>(type);
-  if (!memref)
-    return 1;
-  // For 1d memref we cannot use the stride as leading dimension, but the
-  // leading dimension is the dimension itself.
-  if (memref.getRank() == 1)
-    return memref.getShape()[0];
-
-  SmallVector<int64_t> strides;
-  int64_t offset;
-  if (failed(getStridesAndOffset(memref, strides, offset)))
-    return failure();
-  // fail if the strides are non-constant
-  if (llvm::any_of(strides, [](int64_t stride) {
-        return stride == ShapedType::kDynamic;
-      }))
-    return failure();
-  return strides[pos];
-}
-
 bool isTwoDTransposeOp(vector::TransposeOp transposeOp) {
   auto operandType = dyn_cast<VectorType>(transposeOp.getOperand().getType());
   bool isVnni = vnni::utils::isInVnniLayout(operandType.getRank(), operandType);
   if (isVnni || operandType.getRank() != 2 ||
-      dyn_cast<VectorType>(transposeOp.getResult().getType()).getRank() != 2 ||
-      (isa<scf::ForallOp>(transposeOp->getParentOp()) &&
-       dyn_cast<scf::ForallOp>(transposeOp->getParentOp()).getRank() != 2))
+      dyn_cast<VectorType>(transposeOp.getResult().getType()).getRank() != 2)
     return false;
   return true;
 }
 
-// Extract the operands to be used in the function call. For each memref operand
-// extract the aligned pointer and the offset.
-SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
-                               ValueRange operands, IntegerAttr dataTypeAttr,
-                               Operation *parentOp, bool getResults) {
+SmallVector<Type> extractOperandTypes(OpBuilder &builder, ValueRange operands) {
+  SmallVector<Type> results;
+  // One extra operand for datatype
+  for (Value operand : operands) {
+    Type operandType = operand.getType();
+    if (auto memrefType = isa<MemRefType>(operandType)) {
+      // TODO: non-POD will require an LLVMTypeConverter.
+      Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
+      results.push_back(basePtrType);
+      results.push_back(builder.getIndexType()); // offset
+    } else {
+      results.push_back(operandType);
+    }
+  }
+  return results;
+}
+
+static SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
+                                      ValueRange operands,
+                                      IntegerAttr dataTypeAttr,
+                                      Operation *parentOp) {
   SmallVector<Value> res;
   builder.setInsertionPoint(parentOp);
   for (Value operand : operands) {
@@ -410,111 +403,29 @@ SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
   return res;
 }
 
-SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
-                                            ValueRange operands) {
-  SmallVector<Type> results;
-  // One extra operand for datatype
-  for (Value operand : operands) {
-    Type operandType = operand.getType();
-    if (auto memrefType = dyn_cast<MemRefType>(operandType)) {
-      // TODO: non-POD will require an LLVMTypeConverter.
-      Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
-      results.push_back(basePtrType);
-      results.push_back(builder.getIndexType()); // offset
-    } else {
-      results.push_back(operand.getType());
-    }
+func::CallOp buildXsmmCall(RewriterBase &rewriter, Location loc,
+                           DataTypeAttr dtype, ValueRange operands,
+                           TypeRange results, ModuleOp module,
+                           FlatSymbolRefAttr fnName, Operation *insertBefore) {
+  auto operandTypes = xsmm::utils::extractOperandTypes(rewriter, operands);
+  func::FuncOp funcOp = createFunction(rewriter, module, fnName.getValue(),
+                                       operandTypes, results, false);
+  funcOp.setPrivate();
+
+  func::CallOp call;
+  //  if (insertAfter) {
+  //  rewriter.setInsertionPointAfter(insertAfter);
+  if (insertBefore) {
+    rewriter.setInsertionPoint(insertBefore);
+    auto finalOperands = xsmm::utils::getOperands(
+        rewriter, insertBefore->getLoc(), operands, dtype, insertBefore);
+    call = rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
+                                         finalOperands);
+  } else {
+    call = rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
+                                         operands);
   }
-  return results;
-}
-
-int64_t getOredFlags(ArrayAttr flags) {
-  int64_t oredFlag = 0;
-  for (auto flag : flags) {
-    int64_t intAttr = dyn_cast<IntegerAttr>(flag).getInt();
-    // LIBXSMM is col-major, swap A and B flags.
-    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
-      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
-        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
-      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
-        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
-    }
-    oredFlag |= intAttr;
-  }
-  return oredFlag;
-}
-
-func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
-                               ArrayRef<Value> dispatchOperands,
-                               ArrayRef<Type> dispatchOperandTypes,
-                               ModuleOp module, FlatSymbolRefAttr fnName) {
-  auto libFnType = rewriter.getFunctionType(
-      dispatchOperandTypes, IntegerType::get(rewriter.getContext(), 64));
-
-  if (!module.lookupSymbol(fnName.getAttr())) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    // Insert before module terminator.
-    rewriter.setInsertionPoint(module.getBody(),
-                               std::prev(module.getBody()->end()));
-    func::FuncOp funcOp =
-        rewriter.create<func::FuncOp>(loc, fnName.getValue(), libFnType);
-    funcOp.setPrivate();
-  }
-
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointAfter(dispatchOperands.back().getDefiningOp());
-
-  func::CallOp call = rewriter.create<func::CallOp>(
-      loc, fnName.getValue(), IntegerType::get(rewriter.getContext(), 64),
-      dispatchOperands);
-  return call;
-}
-
-func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
-                             ModuleOp module, SmallVector<Value> inputRange,
-                             SmallVector<Value> prependOperands,
-                             int prependIndex, SmallVector<Value> operandRange,
-                             StringRef invokeName, DataTypeAttr dtype,
-                             bool getResult) {
-  SmallVector<Value> finalOperands;
-  finalOperands.append(operandRange.begin(), operandRange.end());
-  SmallVector<Value> extraOperands;
-  size_t i = 0;
-  while (i < inputRange.size()) {
-    if ((int)i == prependIndex) {
-      extraOperands.append(prependOperands.begin(), prependOperands.end());
-    }
-    extraOperands.push_back(inputRange[i]);
-    i++;
-  }
-  if (prependIndex >= 0 && inputRange.size() == 0) {
-    extraOperands.append(prependOperands.begin(), prependOperands.end());
-  }
-  finalOperands.append(extraOperands.begin(), extraOperands.end());
-  SmallVector<Type> invokeTypes =
-      xsmm::utils::extractInvokeOperandTypes(rewriter, finalOperands);
-  auto loc = parentOp->getLoc();
-  auto libFnType = rewriter.getFunctionType(invokeTypes, {});
-  FlatSymbolRefAttr fnName =
-      SymbolRefAttr::get(rewriter.getContext(), invokeName);
-
-  if (!module.lookupSymbol(fnName)) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    // Insert before module terminator.
-    rewriter.setInsertionPoint(module.getBody(),
-                               std::prev(module.getBody()->end()));
-    func::FuncOp funcOp =
-        rewriter.create<func::FuncOp>(loc, invokeName, libFnType);
-    funcOp.setPrivate();
-  }
-
-  SmallVector<Value> operands = xsmm::utils::getOperands(
-      rewriter, loc, finalOperands, dtype, parentOp, getResult);
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(parentOp);
-  func::CallOp call =
-      rewriter.create<func::CallOp>(loc, fnName, TypeRange(), operands);
-
+  module.dump();
   return call;
 }
 

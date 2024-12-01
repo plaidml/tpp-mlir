@@ -1,7 +1,7 @@
 add_mlir_pdll_library (
-        MLIRConvertTransposePDLLPatternsIncGen
-	ConvertTransposePDL.pdll
-	ConvertTransposePDLLPatterns.h.inc
+        MLIRConvertVectorToXsmmPDLLPatternsIncGen
+	ConvertVectorToXsmmPDL.pdll
+	ConvertVectorToXsmmPDLLPatterns.h.inc
 
   EXTRA_INCLUDES
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -9,7 +9,7 @@ add_mlir_pdll_library (
  )
 
 add_mlir_conversion_library(TPPConvertVectorToXsmm
-   ConvertTranspose.cpp
+   ConvertVectorToXsmm.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/TPP
@@ -18,7 +18,7 @@ add_mlir_conversion_library(TPPConvertVectorToXsmm
 
   DEPENDS
   TPPCompilerPassIncGen
-  MLIRConvertTransposePDLLPatternsIncGen
+  MLIRConvertVectorToXsmmPDLLPatternsIncGen
 
   LINK_LIBS PUBLIC
   MLIRIR

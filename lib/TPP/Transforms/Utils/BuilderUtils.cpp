@@ -35,13 +35,15 @@ arith::ConstantOp getConstant(OpBuilder &builder, Type type, ValueT value) {
 } // anonymous namespace
 
 func::FuncOp createFunction(OpBuilder &builder, ModuleOp module, StringRef name,
-                            TypeRange args, TypeRange ret) {
+                            TypeRange args, TypeRange ret, bool createBody) {
   auto unkLoc = builder.getUnknownLoc();
   auto funcType = FunctionType::get(builder.getContext(), args, ret);
   auto func = func::FuncOp::create(unkLoc, name, funcType);
   func.setVisibility(SymbolTable::Visibility::Public);
-  auto *entryBlock = func.addEntryBlock();
-  builder.setInsertionPointToEnd(entryBlock);
+  if (createBody) {
+    auto *entryBlock = func.addEntryBlock();
+    builder.setInsertionPointToEnd(entryBlock);
+  }
   module.push_back(func);
 
   return func;

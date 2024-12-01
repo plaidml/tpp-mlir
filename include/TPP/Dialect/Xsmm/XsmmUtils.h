@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 
 namespace mlir {
 class Type;
@@ -91,38 +90,25 @@ enum class OperandPos { LHS = 0, RHS = 1 };
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber);
 
-FailureOr<int64_t> getLeadingDim(Type type, size_t pos = 0);
-
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
 
 ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
 
-int64_t getOredFlags(ArrayAttr flags);
-
-SmallVector<Type> extractInvokeOperandTypes(OpBuilder &builder,
-                                            ValueRange operands);
-SmallVector<Value> getOperands(OpBuilder &builder, Location loc,
-                               ValueRange operands, IntegerAttr dataTypeAttr);
-
 bool isTwoDTransposeOp(vector::TransposeOp transposeOp);
-
-func::CallOp buildDispatchCall(RewriterBase &rewriter, Location loc,
-                               ArrayRef<Value> dispatchOperands,
-                               ArrayRef<Type> dispatchOperandTypes,
-                               ModuleOp module, FlatSymbolRefAttr fnName);
-func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
-                             ModuleOp module, SmallVector<Value> inputOperands,
-                             SmallVector<Value> prependValues, int prependIndex,
-                             SmallVector<Value> operands, StringRef invokeName,
-                             DataTypeAttr dtype, bool getResults = false);
 
 template <typename DispatchOpTy>
 FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
                                                  DispatchOpTy dispatchOpTy,
                                                  bool returnNone);
+SmallVector<Type> extractOperandTypes(OpBuilder &builder,
+                                      ArrayRef<Value> operands);
 
+func::CallOp buildXsmmCall(RewriterBase &rewriter, Location loc,
+                           DataTypeAttr dtype, ValueRange operands,
+                           TypeRange results, ModuleOp module,
+                           FlatSymbolRefAttr fnName, Operation *insertBefore);
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir
