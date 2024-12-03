@@ -57,7 +57,7 @@ llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
                                    llvm::cl::desc("Lower linalg to vector"),
                                    llvm::cl::init(false));
 
-llvm::cl::opt<bool> vectorToKernel("vector-to-kernel",
+llvm::cl::opt<bool> vectorToKernel("vector-to-kernels",
                                    llvm::cl::desc("Lower vector to micro-kernels"),
                                    llvm::cl::init(false)); 
 
