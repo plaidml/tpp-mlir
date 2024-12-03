@@ -153,15 +153,17 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions;
+      DefaultTppPassesOptions tppDefaultOptions; 
       tppDefaultOptions.linalgToLoops = linalgToLoops;
-      tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+      tppDefaultOptions.parallelTaskGrid = SmallVector<unsigned>{
+          parallelTaskGrid.begin(), parallelTaskGrid.end()};
       tppDefaultOptions.linalgToVector = linalgToVector;
       tppDefaultOptions.vectorToXSMM = vectorToXSMM;
-      tppDefaultOptions.lowerPackUnpackWithoutTranspose =
-          lowerPackUnpackWithoutTranspose;
-      tppDefaultOptions.lhsTile = lhsTile;
-      tppDefaultOptions.rhsTile = rhsTile;
+      tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
+      tppDefaultOptions.lhsTile =
+          SmallVector<unsigned>{lhsTile.begin(), lhsTile.end()};
+      tppDefaultOptions.rhsTile =
+          SmallVector<unsigned>{rhsTile.begin(), rhsTile.end()};
       tppDefaultOptions.vectorToKernel = vectorToKernel;
 
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));

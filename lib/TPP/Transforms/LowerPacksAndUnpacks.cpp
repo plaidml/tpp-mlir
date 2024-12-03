@@ -229,8 +229,8 @@ class LowerPacksAndUnPacks
         rewriter.replaceOp(packOp, tilingResult->replacements);
       });
       RewritePatternSet patterns(&getContext());
-      patterns.add<linalg::GeneralizeOuterUnitDimsUnPackOpPattern,
-                   linalg::GeneralizeOuterUnitDimsPackOpPattern>(&getContext());
+      patterns.add<linalg::DecomposeOuterUnitDimsUnPackOpPattern,
+                   linalg::DecomposeOuterUnitDimsPackOpPattern>(&getContext());
       tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {

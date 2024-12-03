@@ -142,8 +142,6 @@ void Bufferize::runOnOperation() {
 
   if (!runOnlyAnalysis) {
     passManager.addPass(bufferization::createDropEquivalentBufferResultsPass());
-    passManager.addNestedPass<func::FuncOp>(
-        bufferization::createFinalizingBufferizePass());
 
     // Post-processing.
     passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());

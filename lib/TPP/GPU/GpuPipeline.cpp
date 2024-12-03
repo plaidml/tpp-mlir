@@ -172,7 +172,8 @@ private:
     // First split computation into grid with blocks of specified size.
     TileConsumerAndFuseProducersOptions blockTileOptions;
     if (!llvm::any_of(gpuBlockTile, [](int64_t tile) { return tile == -1; }))
-      blockTileOptions.tileSizes = gpuBlockTile;
+      blockTileOptions.tileSizes =
+          SmallVector<int64_t>{gpuBlockTile.begin(), gpuBlockTile.end()};
     blockTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(blockTileOptions));
 
@@ -182,7 +183,8 @@ private:
     // chance for outlining.
     TileConsumerAndFuseProducersOptions threadTileOptions;
     if (!llvm::any_of(gpuThreadTile, [](int64_t tile) { return tile == -1; }))
-      threadTileOptions.tileSizes = gpuThreadTile;
+      threadTileOptions.tileSizes =
+          SmallVector<int64_t>{gpuThreadTile.begin(), gpuThreadTile.end()};
     threadTileOptions.minTileFactor = 1;
     pm.addPass(createTileConsumerAndFuseProducers(threadTileOptions));
     pm.addPass(createCleanup());
@@ -214,7 +216,8 @@ private:
 
     // Convert to generic GPU ops.
     pm.addPass(createGpuConversion(GpuConversionOptions{
-        gpuType == GpuType::Intel, kTile, stages, gpuDpasTile}));
+        gpuType == GpuType::Intel, kTile, stages,
+        SmallVector<int64_t>{gpuDpasTile.begin(), gpuDpasTile.end()}}));
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {

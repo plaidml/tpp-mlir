@@ -23,6 +23,8 @@
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
 
+#include <string>
+
 using namespace mlir;
 using namespace mlir::tpp;
 
@@ -136,7 +138,8 @@ private:
       if (linalgToVector || forceLinalgToVector) {
         // Vectorizes the remaining Linalg operations
         pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(
-            BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
+            BrgemmLinalgTilingOptions{SmallVector<unsigned>{*lhsTile},
+                                      SmallVector<unsigned>{*rhsTile}}));
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
 
@@ -159,7 +162,8 @@ private:
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
-    LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
+    LowLevelParallelizationOptions LowLevelParallelization{
+        SmallVector<unsigned>{*parallelTaskGrid}};
 
     if (linalgToVector) {
       pm.addPass(createConvertVectorToSCFPass());

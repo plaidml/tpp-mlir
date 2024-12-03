@@ -20,6 +20,8 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
+
+#include <optional>
 #include <queue>
 
 using namespace mlir;
@@ -421,15 +423,18 @@ static FailureOr<scf::SCFTileAndFuseResult> fuseWithEltwise(
   tileAndFuseOptions.setTilingOptions(options);
   scf::SCFTileAndFuseOptions::ControlFnTy controlFn =
       [&](tensor::ExtractSliceOp candidateSliceOp, OpResult originalProducer,
-          bool isDestinationOperand) {
-        Operation *candidateOp = originalProducer.getOwner();
-        if (!candidateOp || worklist.count(candidateOp) == 0 ||
-            (alreadyFusedOps.count(candidateOp) &&
-             !isa<linalg::FillOp>(candidateOp))) {
-          return std::make_tuple(false, false);
-        }
-        return std::make_tuple(true, false);
-      };
+          bool isDestinationOperand)
+      -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
+    Operation *candidateOp = originalProducer.getOwner();
+    if (!candidateOp || worklist.count(candidateOp) == 0 ||
+        (alreadyFusedOps.count(candidateOp) &&
+         !isa<linalg::FillOp>(candidateOp))) {
+      return std::nullopt;
+    }
+    scf::SCFTileAndFuseOptions::ControlFnResult res;
+    res.yieldProducerReplacement = false;
+    return res;
+  };
   tileAndFuseOptions.setFusionControlFn(controlFn);
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
       scf::tileConsumerAndFuseProducersUsingSCF(rewriter, consumer,
