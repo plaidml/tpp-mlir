@@ -57,6 +57,12 @@ echo_run ./driver.py -vv \
          -c "${CONFIG_DIR}/base/base.json" \
          --build "${BUILD_DIR}"
 
+echo " ========= Vector-to-kernel  Base Benchmarks ==========="
+echo_run ./driver.py -vv \
+         -n ${NUM_ITER} \
+         -c "${CONFIG_DIR}/base/vector-to-kernel.json" \
+         --build "${BUILD_DIR}"
+
 echo " ========= PyTorch Benchmarks ==========="
 echo_run ./driver.py -vv \
          -n ${NUM_ITER} \
@@ -64,7 +70,7 @@ echo_run ./driver.py -vv \
          --build "${BUILD_DIR}"
 
 echo " ========= OpenMP Benchmarks ==========="
-for cfg in dnn-fp32 dnn-bf16 mlir-fp32 mlir-bf16; do
+for cfg in dnn-fp32 dnn-bf16 mlir-fp32 mlir-bf16 mlir-fp32-vector; do
   echo_run ./driver.py -vv \
            -n ${NUM_ITER} \
            -c "${CONFIG_DIR}/omp/${cfg}.json" \

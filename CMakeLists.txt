@@ -82,6 +82,7 @@ set(CONFIG_DIR "${BENCHMARK_DIR}/config")
 # Run baseline benchmarks with default iterations to track simple performance
 set(BENCH_CFGS
   ${CONFIG_DIR}/base/base.json
+  ${CONFIG_DIR}/base/vector-to-kernel.json
   ${CONFIG_DIR}/base/pack.json
   ${CONFIG_DIR}/base/mha.json
   ${CONFIG_DIR}/base/named-ops.json
@@ -100,7 +101,9 @@ set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/dnn-bf16.json
   ${CONFIG_DIR}/omp/mlir-fp32.json
   ${CONFIG_DIR}/omp/mlir-bf16.json
+  ${CONFIG_DIR}/omp/mlir-fp32-vector.json
   ${CONFIG_DIR}/omp/torch-dynamo.json
+  ${CONFIG_DIR}/omp/torch-dynamo-vector-to-kernel.json
 )
 string(JOIN ',' BENCH_OMP_CFGS_STR ${BENCH_OMP_CFGS})
 add_custom_target(benchmarks-omp ${BENCHMARK_DIR}/driver.py -v --build ${PROJECT_BINARY_DIR} -n 10

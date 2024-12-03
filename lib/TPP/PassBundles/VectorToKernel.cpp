@@ -48,7 +48,6 @@ struct VectorToKernel : public tpp::impl::VectorToKernelBase<VectorToKernel>,
 
 private:
   void constructPipeline() override {
-    LLVM_DEBUG(llvm::dbgs() << "Adding vector-to-kernel passes\n");
-    // Not Implemented Yet.
+    pm.addNestedPass<func::FuncOp>(createVectorContractToFMA());
   }
 };

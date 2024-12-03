@@ -96,6 +96,7 @@ benchmark () {
 # Base Benchmarks
 if [ "$BENCH_BASE" ]; then
   benchmark base/base.json "Base Benchmarks"
+  benchmark base/vector-to-kernel.json "Base Vector-to-kernel Benchmarks"
   benchmark base/pack.json "Pack Benchmarks"
   benchmark base/mha.json "MHA Benchmarks"
   benchmark base/named-ops.json "Named Ops Benchmarks"
@@ -111,8 +112,10 @@ if [ "$BENCH_OMP" ]; then
   benchmark omp/dnn-fp32.json "OpenMP XSMM-DNN FP32"
   benchmark omp/dnn-bf16.json "OpenMP XSMM-DNN BF16"
   benchmark omp/mlir-fp32.json "OpenMP TPP-MLIR FP32"
+  benchmark omp/mlir-fp32-vector.json "OpenMP TPP-MLIR VECTOR-TO-KERNEL FP32"
   benchmark omp/mlir-bf16.json "OpenMP TPP-MLIR BF16"
   benchmark omp/torch-dynamo.json "OpenMP TPP-MLIR PyTorch"
+  benchmark omp/torch-dynamo-vector-to-kernel.json "OpenMP TPP-MLIR VECTOR-TO-KERNEL PyTorch"
 fi
 
 # Matmul Benchmarks
