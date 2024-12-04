@@ -91,6 +91,7 @@ private:
       skipOperations.push_back("all");
     }
     if (vectorToXSMM) {
+      skipOperations.clear();
       skipOperations.push_back("transpose");
       skipOperations.push_back("vnni");
     }
@@ -141,8 +142,10 @@ private:
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-
         if (vectorToXSMM) {
+          if (printVector) {
+            pm.addPass(createPrintIRPass());
+          }
           pm.addPass(createVectorToXSMM());
         }
         if (vectorToKernel) {

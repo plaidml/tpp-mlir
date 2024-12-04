@@ -102,7 +102,7 @@ convertTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
       xsmm::UnaryFlags::NONE);
   if (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::TRANSPOSE,
                                   outType)) {
-    // Adjust ldO based on vnni factor
+    // Adjust ldo based on vnni factor
     auto vnniFactor = *vnni::utils::getVnniBlockingFactor(outType);
     unaryInfo.ldo = unaryInfo.ldo / vnniFactor;
   } else {
@@ -116,7 +116,7 @@ static LogicalResult validateTransposeOp(PatternRewriter &rewriter,
                                          Operation *transposeOp,
                                          Operation *input, Operation *output,
                                          Type outputType) {
-  LLVM_DEBUG(llvm::dbgs() << "validateTransposeOpImpl\n");
+  LLVM_DEBUG(llvm::dbgs() << "validateTransposeOp\n");
   Value result = input->getResult(0);
   Value source = input->getOperand(0);
   VectorType outType = cast<VectorType>(outputType);

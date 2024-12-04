@@ -93,6 +93,7 @@ namespace {
 enum class PrintStage {
   None,
   Early, // After main generation, before optimization
+  Opt,   // After vector code generation
   Mid,   // After initial TPP-related optimizations
   Late,  // After optimizaiton, before LLVM dialect
   LLVM,  // Final MLIR, in LLVM dialect
@@ -102,6 +103,7 @@ enum class PrintStage {
 PrintStage parsePrintStage(StringRef stage) {
   return StringSwitch<PrintStage>(stage)
       .CaseLower("early", PrintStage::Early)
+      .CaseLower("opt", PrintStage::Opt)
       .CaseLower("mid", PrintStage::Mid)
       .CaseLower("late", PrintStage::Late)
       .CaseLower("llvm", PrintStage::LLVM)
@@ -156,7 +158,9 @@ private:
 	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
 	  tppDefaultOptions.linalgToVector = linalgToVector;
           tppDefaultOptions.vectorToXSMM = vectorToXSMM;
-          tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
+          if (print == PrintStage::Opt)
+		tppDefaultOptions.printVector = true;
+	  tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
 	  tppDefaultOptions.lhsTile = lhsTile;
 	  tppDefaultOptions.rhsTile = rhsTile;
 

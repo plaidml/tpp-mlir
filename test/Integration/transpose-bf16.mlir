@@ -1,5 +1,6 @@
 // RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
 // RUN: tpp-run --linalg-to-loops %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=opt  2>&1 | FileCheck %s --check-prefix=VECTOR
 // RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s --check-prefix=XSMM
 
 func.func @entry(%arg0 : tensor<4x4xbf16>, %arg1 : tensor<2x4x2xbf16>)-> tensor<2x4x2xbf16> {
@@ -11,6 +12,9 @@ func.func @entry(%arg0 : tensor<4x4xbf16>, %arg1 : tensor<2x4x2xbf16>)-> tensor<
   return %retval: tensor<2x4x2xbf16>
 }
 
+// VECTOR: vector.transfer_read
+// VECTOR: vector.transpose
+// VECTOR: vector.transfer_write
 // XSMM: call @xsmm_unary_dispatch
 // XSMM: call @xsmm_unary_invoke
 
