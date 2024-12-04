@@ -29,6 +29,7 @@ set(LIBS
         MLIRSupport
         MLIROptLib
         TPPPipeline
+        TPPOptions
         TPPTransforms
         TPPRunner
         tpp_xsmm_runner_utils

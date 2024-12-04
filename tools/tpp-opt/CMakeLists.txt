@@ -15,6 +15,7 @@ set(LIBS
         MLIRToLLVMIRTranslationRegistration
         MLIROptLib
         TPPPipeline
+        TPPOptions
         TPPRunner
         TPPTransforms
         tpp_xsmm_runner_utils

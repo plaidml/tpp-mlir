@@ -23,4 +23,5 @@ add_mlir_library(TPPPassBundles
     TPPTransforms
     ${mlir_dialect_libs}
     ${conversion_libs}
+    TPPOptions
   )

@@ -2,6 +2,7 @@ add_subdirectory(Conversion)
 add_subdirectory(Dialect)
 add_subdirectory(GPU)
 add_subdirectory(IR)
+add_subdirectory(Options)
 add_subdirectory(PassBundles)
 add_subdirectory(Runner)
 add_subdirectory(Transforms)
@@ -26,4 +27,5 @@ add_mlir_library(TPPPipeline
     ${conversion_libs}
     TPPGPU
     TPPPassBundles
+    TPPOptions
   )
