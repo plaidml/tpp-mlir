@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -default-tpp-passes -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -default-tpp-passes -parallel-task-grid=1,1 -split-input-file | FileCheck %s
 
 func.func @matmul(%arg0: tensor<2048x2048xbf16>, %arg1: tensor<2048x2048xbf16>, %arg2: tensor<2048x2048xbf16>)
     -> tensor<2048x2048xbf16> {
