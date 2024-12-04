@@ -21,6 +21,7 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Perf/PerfOps.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Options/GpuOptions.h"
 #include "TPP/Options/PipelineOptions.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
@@ -99,18 +100,10 @@ private:
 
     if (!gpuBackend.empty()) {
       // Apply the custom GPU lowering pipeline
-      pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
+      pm.addPass(createGpuPipeline());
     } else {
-      // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions; 
-          tppDefaultOptions.linalgToLoops = linalgToLoops;
-	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
-	  tppDefaultOptions.linalgToVector = linalgToVector;
-          tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
-	  tppDefaultOptions.lhsTile = lhsTile;
-	  tppDefaultOptions.rhsTile = rhsTile;
-
-      pm.addPass(createDefaultTppPasses(tppDefaultOptions));
+      // Apply the default lowering passes
+      pm.addPass(createDefaultTppPasses());
     }
 
     if (print == PrintStage::Mid)

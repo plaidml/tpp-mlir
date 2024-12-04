@@ -22,11 +22,11 @@ namespace tpp {
 namespace opt {
 
 // Select target GPU backend for the pipeline.
-extern llvm::cl::opt<std::string> defGpuBackend;
+extern llvm::cl::opt<std::string> gpuBackend;
 
 // Kernel buffers - arguments and return values - are expected to be allocated
 // on GPU.
-extern llvm::cl::opt<bool> defGpuArgs;
+extern llvm::cl::opt<bool> gpuArgs;
 
 extern llvm::cl::list<int64_t> gpuBlockTile;
 

@@ -152,19 +152,18 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   tpp::TppRunnerWrapperOptions wrapperOpts;
   wrapperOpts.kernelName = options.mainFuncName;
   wrapperOpts.kernelType = options.mainFuncType;
-  wrapperOpts.backend = defGpuBackend;
-  wrapperOpts.offloadToDevice = defGpuArgs;
+  wrapperOpts.backend = gpuBackend;
+  wrapperOpts.offloadToDevice = gpuArgs;
   wrapperOpts.numBenchLoops = benchNumLoops;
   // Warmup on GPUs are currently breaking buffer allocation on GPUs
-  wrapperOpts.benchWarmup = defGpuBackend.empty();
+  wrapperOpts.benchWarmup = gpuBackend.empty();
   wrapperOpts.printResult = printKernelResult;
   wrapperOpts.randomSplat = splatRandom;
   wrapperOpts.seed = seed;
   wrapperOpts.initType = initType;
   passManager.addPass(tpp::createTppRunnerWrapper(wrapperOpts));
 
-  tpp::DefaultPipelineOptions defPipelineOpts{defGpuBackend};
-  passManager.addPass(tpp::createDefaultPipeline(defPipelineOpts));
+  passManager.addPass(tpp::createDefaultPipeline());
 
   auto result = passManager.run(module);
   if (failed(result)) {

@@ -20,11 +20,13 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Options/PipelineOptions.h"
 #include "TPP/PassUtils.h"
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
+using namespace mlir::tpp::opt;
 
 namespace mlir {
 namespace tpp {
@@ -113,8 +115,7 @@ private:
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
-      TppMappingOptions tppMappingOptions{lowerPackUnpackWithoutTranspose};
-      pm.addPass(createTppMapping(tppMappingOptions));
+      pm.addPass(createTppMapping());
 
       // Generalize tensor.pack and tensor.unpack.
       pm.addPass(createLowerPacksAndUnPacks());
@@ -155,15 +156,14 @@ private:
     // Convert forAll to parallel loops should run after bufferization
     // as scf.parallel does not handle tensor.
     pm.addPass(createConvertForAllToParallelOp());
-    LowLevelParallelizationOptions LowLevelParallelization{parallelTaskGrid};
 
     if (linalgToVector) {
       pm.addPass(createConvertVectorToSCFPass());
       // Low level parallelization passes.
-      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+      pm.addPass(createLowLevelParallelization());
     } else {
       // Low level parallelization passes.
-      pm.addPass(createLowLevelParallelization(LowLevelParallelization));
+      pm.addPass(createLowLevelParallelization());
       // TODO: These passes have been moved out of low level parallelization
       // pass since these apply on xsmm dialect. They'll be moved back in
       // subsequent commits.

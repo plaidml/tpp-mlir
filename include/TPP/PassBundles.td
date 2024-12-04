@@ -16,11 +16,6 @@ def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   let description = [{
     A collection of passes that lower everything to MLIR LLVM IR.
   }];
-  let options = [
-    Option<"gpuBackend", "gpu", "std::string",
-            /*default=*/"\"\"",
-           "Optional target GPU backend.">,
-  ];
 }
 
 def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
@@ -29,30 +24,6 @@ def DefaultTppPasses : Pass<"default-tpp-passes", "ModuleOp"> {
     A collection of passes that lower everything TPP-related
     to standard low-level dialects.
   }];
-  let options= [
-    Option<"linalgToLoops", "linalg-to-loops",
-           "bool", /*default=*/"false",
-           "Skip all TPP transformations. Lower linalg directly to loops.">,
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">,
-    Option<"linalgToVector", "linalg-to-vector",
-           "bool", /*default=*/"false",
-           "Lower linalg directly to vector.">,
-    Option<"vectorToXSMM", "vector-to-xsmm",
-           "bool", /*default=*/"false",
-           "Lower vector patterns to XSMM calls.">,
-    Option<"vectorToKernel", "vector-to-kernel",
-           "bool", /*default=*/"false",
-           "Lower vector patterns to micro-kernels.">,
-    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
-           "bool", /*default=*/"false",
-           "Lower non-constant packs and unpacks reverting any dim permutations.">,
-    ListOption<"lhsTile", "lhsTile",
-           "unsigned", "Lhs tile size for brgemm operation.">,
-    ListOption<"rhsTile", "rhsTile",
-           "unsigned", "Rhs tile size for brgemm operation.">,
-
-  ];
 }
 
 def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
@@ -65,11 +36,6 @@ def TppMapping : Pass<"tpp-mapping", "ModuleOp"> {
                            "memref::MemRefDialect",
                            "scf::SCFDialect",
                            "tensor::TensorDialect"];
-  let options= [
-    Option<"lowerPackUnpackWithoutTranspose", "lower-pack-unpack-without-transpose",
-           "bool", /*default=*/"false",
-           "Lower non-constant packs and unpacks reverting any dim permutations.">
-  ];
 }
 
 def LinalgLowering : Pass<"linalg-lowering", "func::FuncOp"> {
@@ -104,11 +70,6 @@ def LowLevelParallelization : Pass<"low-level-parallel", "ModuleOp"> {
                            "scf::SCFDialect",
                            "xsmm::XsmmDialect",
                            "LLVM::LLVMDialect"];
-  let options = [
-    ListOption<"parallelTaskGrid", "parallel-task-grid",
-           "unsigned", "Grid-sizes for parallel tasks.">
-
-  ];
 }
 
 def LocalDialectsLowering : Pass<"lower-local-dialects", "ModuleOp"> {
@@ -142,11 +103,6 @@ def Cleanup : Pass<"cleanup"> {
 
 def GpuPipeline : Pass<"gpu-pipeline", "ModuleOp"> {
   let summary = "Lower all eligible operations into GPU compatible IR";
-  let options = [
-    Option<"gpuBackend", "gpu", "std::string",
-            /*default=*/"\"cuda\"",
-           "Target GPU backend for lowering (cuda).">,
-  ];
 }
 
 def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
@@ -159,19 +115,6 @@ def GpuConversion : Pass<"gpu-conversion", "ModuleOp"> {
                            "scf::SCFDialect",
                            "memref::MemRefDialect",
                            "xegpu::XeGPUDialect"];
-  let options = [
-    Option<"isIntel", "intel",
-           "bool", /*default=*/"false",
-           "Convert for Intel GPU">,
-    Option<"kTile", "k-tile", "int64_t",
-           /*default=*/"32",
-           "GEMM tile size for reduction dimension.">,
-    Option<"stages", "stages", "int64_t",
-           /*default=*/"1",
-           "Number of cooperative prefetch stages.">,
-    ListOption<"dpasTile", "dpas-tile", "int64_t",
-               "DPAS register block sizes MxNxK">,
-  ];
 }
 
 def GpuToCuda : Pass<"gpu-to-cuda", "ModuleOp"> {

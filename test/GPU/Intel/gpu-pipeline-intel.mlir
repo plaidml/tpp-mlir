@@ -1,4 +1,4 @@
-// RUN: tpp-opt %s -gpu-pipeline=gpu=intel \
+// RUN: tpp-opt %s -gpu-pipeline -gpu=intel \
 // RUN:  -gpu-block-tile=128,128 -gpu-thread-tile=32,32 -k-tile=32 -stages=1 \
 // RUN:  -split-input-file | \
 // RUN: FileCheck %s

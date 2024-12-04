@@ -21,12 +21,14 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "TPP/Options/GpuOptions.h"
 #include "TPP/PassUtils.h"
 
 #include <optional>
 
 using namespace mlir;
 using namespace mlir::tpp;
+using namespace mlir::tpp::opt;
 
 namespace mlir {
 namespace tpp {
@@ -64,9 +66,9 @@ private:
     // First lower linalg using custom patterns then fall back to
     // the default lowering for any remaining ops.
     pm.addNestedPass<func::FuncOp>(createLinalgDeGeneralize());
-    if (isIntel) {
-      pm.addNestedPass<func::FuncOp>(
-          createLinalgToXeGPU(LinalgToXeGPUOptions{kTile, stages, dpasTile}));
+    if (gpuBackend == "intel") {
+      pm.addNestedPass<func::FuncOp>(createLinalgToXeGPU(
+          LinalgToXeGPUOptions{kTile, stages, gpuDpasTile}));
     }
     pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
     pm.addPass(createCleanup());

@@ -35,6 +35,10 @@ extern llvm::cl::list<unsigned> parallelTaskGrid;
 
 extern llvm::cl::opt<bool> linalgToVector;
 
+extern llvm::cl::opt<bool> vectorToXSMM;
+
+extern llvm::cl::opt<bool> vectorToKernel;
+
 extern llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose;
 
 // Lhs tile sizes for linalg-to-vector.

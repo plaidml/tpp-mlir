@@ -19,10 +19,12 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "TPP/Options/PipelineOptions.h"
 #include "TPP/PassUtils.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
+using namespace mlir::tpp::opt;
 
 namespace mlir {
 namespace tpp {

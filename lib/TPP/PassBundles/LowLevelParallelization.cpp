@@ -20,10 +20,12 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Options/PipelineOptions.h"
 #include "TPP/PassUtils.h"
 
 using namespace mlir;
 using namespace mlir::tpp;
+using namespace mlir::tpp::opt;
 
 namespace mlir {
 namespace tpp {

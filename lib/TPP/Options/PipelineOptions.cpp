@@ -44,6 +44,16 @@ llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
                                    llvm::cl::desc("Lower linalg to vector"),
                                    llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+    vectorToXSMM("def-vector-to-xsmm",
+                 llvm::cl::desc("Lower vector patterns to XSMM calls."),
+                 llvm::cl::init(false));
+
+llvm::cl::opt<bool>
+    vectorToKernel("def-vector-to-kernel",
+                   llvm::cl::desc("Lower vector patterns to micro-kernels."),
+                   llvm::cl::init(false));
+
 llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
     llvm::cl::desc("Lower packs and unpacks reverting any dim permutations"),

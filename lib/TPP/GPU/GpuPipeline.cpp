@@ -61,7 +61,7 @@ GpuType parseGpuOption(StringRef gpuStr) {
   auto type = llvm::StringSwitch<std::optional<GpuType>>(gpuStr)
                   .CaseLower("cuda", GpuType::Cuda)
                   .CaseLower("intel", GpuType::Intel)
-                  .Default(std::nullopt);
+                  .Default(GpuType::Cuda);
   assert(type && "Unsupported GPU backend");
 
   return *type;
@@ -132,7 +132,7 @@ struct GpuPipeline : public tpp::impl::GpuPipelineBase<GpuPipeline>,
 
 private:
   void constructPipeline() override {
-    GpuType gpuType = parseGpuOption(this->gpuBackend);
+    GpuType gpuType = parseGpuOption(gpuBackend);
     GpuOptions gpuOptions = getGpuOptions(gpuType);
 
     // Input preprocessing.
@@ -187,8 +187,7 @@ private:
     pm.addPass(createCleanup());
 
     // Convert to generic GPU ops.
-    pm.addPass(createGpuConversion(GpuConversionOptions{
-        gpuType == GpuType::Intel, kTile, stages, gpuDpasTile}));
+    pm.addPass(createGpuConversion());
 
     // Lower GPU ops to the chosen GPU backend.
     switch (gpuType) {

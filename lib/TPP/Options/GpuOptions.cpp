@@ -18,15 +18,14 @@ namespace opt {
 
 // Select target GPU backend for the pipeline.
 llvm::cl::opt<std::string>
-    defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda,intel"), llvm::cl::init(""));
+    gpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
+               llvm::cl::value_desc("cuda,intel"), llvm::cl::init(""));
 
 // Kernel buffers - arguments and return values - are expected to be allocated
 // on GPU.
 llvm::cl::opt<bool>
-    defGpuArgs("gpu-args",
-               llvm::cl::desc("Kernel buffers are allocated on GPU"),
-               llvm::cl::init(true));
+    gpuArgs("gpu-args", llvm::cl::desc("Kernel buffers are allocated on GPU"),
+            llvm::cl::init(true));
 
 llvm::cl::list<int64_t>
     gpuBlockTile("gpu-block-tile", llvm::cl::desc("GPU block tile size"),

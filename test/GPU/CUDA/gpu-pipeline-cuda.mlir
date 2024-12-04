@@ -1,5 +1,5 @@
 // RUN: ASAN_OPTIONS=protect_shadow_gap=0:replace_intrin=0:detect_leaks=0:${ASAN_OPTIONS} \
-// RUN: tpp-opt %s -gpu-pipeline=gpu=cuda -split-input-file | FileCheck %s
+// RUN: tpp-opt %s -gpu-pipeline -gpu=cuda -split-input-file | FileCheck %s
 
 func.func @packed_brgemm(%arg0: memref<4x16x64x64xf32>, %arg1: memref<16x16x64x64xf32>, %arg2: memref<4x16x64x64xf32>) {
   %c0 = arith.constant 0 : index
