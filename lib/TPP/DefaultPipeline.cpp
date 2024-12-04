@@ -70,14 +70,14 @@ llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
 llvm::cl::list<unsigned>
     lhsTile("lhsTile",
                      llvm::cl::desc("Lhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 8}),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{4, 32}),
                      llvm::cl::CommaSeparated);
 
 // Rhs tile sizes for linalg-to-vector
 llvm::cl::list<unsigned>
     rhsTile("rhsTile",
                      llvm::cl::desc("Rhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
+                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{32, 1}),
                      llvm::cl::CommaSeparated);
 
 namespace mlir {
