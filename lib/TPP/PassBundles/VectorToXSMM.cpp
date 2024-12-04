@@ -35,7 +35,7 @@ namespace tpp {
 // Apply collection of vector-level passes that map vector patterns to
 // libxsmm call pairs (dispatch, invoke).
 struct VectorToXSMM : public tpp::impl::VectorToXSMMBase<VectorToXSMM>,
-                      PassBundle<ModuleOp> {
+                      tpp::PassBundle<ModuleOp> {
   void runOnOperation() override {
     auto module = getOperation();
 

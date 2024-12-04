@@ -10,7 +10,6 @@
 #define TPP_DIALECT_TPP_PASSBUNDLES
 
 include "mlir/Pass/PassBase.td"
-include "mlir/Dialect/PDL/IR/PDLDialect.td"
 
 def DefaultPipeline : Pass<"default-pipeline", "ModuleOp"> {
   let summary = "The default compiler lowering pipeline";
