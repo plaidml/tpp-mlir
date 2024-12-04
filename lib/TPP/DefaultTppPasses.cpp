@@ -92,10 +92,10 @@ private:
     }
     if (vectorToXSMM)
       skipOperations.clear();
+    
     if (vectorToKernel && !linalgToVector) {
 	 skipOperations.push_back("all");
     }
-      //skipOperations.clear();
 
     // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
