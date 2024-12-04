@@ -77,20 +77,23 @@ private:
     //  * Vector-to-Kernel: Enable with `vector-to-kernel` flag, forces
     //    `linalg-to-vector` and lowers vector patterns to libxsmm-like
     //    micro-kernels via specialized lowering of certain vector patterns.
-    assert(!(vectorToXSMM && vectorToKernel) && "XSMM and Kernel lowering are mutually exclusive");
+    assert(!(vectorToXSMM && vectorToKernel) &&
+           "XSMM and Kernel lowering are mutually exclusive");
     bool forceLinalgToVector = (vectorToXSMM || vectorToKernel);
 
     // List of operations to skip when lowering Linalg to XSMM / Kernel.
     // This allows further passes to lower to vector, function, codegen
     // Default is to not skip anything. Only enable when needed.
-    ArrayRef<std::string> skipOperations;
-    // General "linalg-to-vector" choice needs to skip all XSMM matching at linalg level.
-    if (linalgToVector)
-      skipOperations = { "all" };
+    SmallVector<std::string> skipOperations;
+    // General "linalg-to-vector" choice needs to skip all XSMM matching at
+    // linalg level.
+    if (linalgToVector) {
+      skipOperations.push_back("all");
+    }
     if (vectorToXSMM)
-      skipOperations = { };
+      skipOperations.clear();
     if (vectorToKernel)
-      skipOperations = { };
+      skipOperations.clear();
 
     // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
@@ -110,8 +113,7 @@ private:
       pm.addPass(createRewriteBatchMatmulToMatmul());
 
       // Applies a set of passes at the linalg level to fuse and pack.
-      TppMappingOptions tppMappingOptions{
-          lowerPackUnpackWithoutTranspose};
+      TppMappingOptions tppMappingOptions{lowerPackUnpackWithoutTranspose};
       pm.addPass(createTppMapping(tppMappingOptions));
 
       // Generalize tensor.pack and tensor.unpack.
@@ -127,11 +129,13 @@ private:
       pm.addPass(createBufferize());
 
       // Lower Linalg to XSMM.
-      pm.addNestedPass<func::FuncOp>(createLinalgLowering(LinalgLoweringOptions{skipOperations}));
+      pm.addNestedPass<func::FuncOp>(
+          createLinalgLowering(LinalgLoweringOptions{skipOperations}));
 
       if (linalgToVector || forceLinalgToVector) {
         // Vectorizes the remaining Linalg operations
-	pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
+        pm.addNestedPass<func::FuncOp>(createBrgemmLinalgTiling(
+            BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
