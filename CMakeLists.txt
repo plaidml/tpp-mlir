@@ -101,7 +101,7 @@ set(BENCH_OMP_CFGS
   ${CONFIG_DIR}/omp/dnn-bf16.json
   ${CONFIG_DIR}/omp/mlir-fp32.json
   ${CONFIG_DIR}/omp/mlir-bf16.json
-  ${CONFIG_DIR}/omp/mlir-fp32-vector.json
+  ${CONFIG_DIR}/omp/mlir-fp32-vector-to-kernel.json
   ${CONFIG_DIR}/omp/torch-dynamo.json
   ${CONFIG_DIR}/omp/torch-dynamo-vector-to-kernel.json
 )

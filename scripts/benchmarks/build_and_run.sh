@@ -70,7 +70,7 @@ echo_run ./driver.py -vv \
          --build "${BUILD_DIR}"
 
 echo " ========= OpenMP Benchmarks ==========="
-for cfg in dnn-fp32 dnn-bf16 mlir-fp32 mlir-bf16 mlir-fp32-vector; do
+for cfg in dnn-fp32 dnn-bf16 mlir-fp32 mlir-bf16 mlir-fp32-vector-to-kernel; do
   echo_run ./driver.py -vv \
            -n ${NUM_ITER} \
            -c "${CONFIG_DIR}/omp/${cfg}.json" \

@@ -112,7 +112,7 @@ if [ "$BENCH_OMP" ]; then
   benchmark omp/dnn-fp32.json "OpenMP XSMM-DNN FP32"
   benchmark omp/dnn-bf16.json "OpenMP XSMM-DNN BF16"
   benchmark omp/mlir-fp32.json "OpenMP TPP-MLIR FP32"
-  benchmark omp/mlir-fp32-vector.json "OpenMP TPP-MLIR VECTOR-TO-KERNEL FP32"
+  benchmark omp/mlir-fp32-vector-to-kernel.json "OpenMP TPP-MLIR VECTOR-TO-KERNEL FP32"
   benchmark omp/mlir-bf16.json "OpenMP TPP-MLIR BF16"
   benchmark omp/torch-dynamo.json "OpenMP TPP-MLIR PyTorch"
   benchmark omp/torch-dynamo-vector-to-kernel.json "OpenMP TPP-MLIR VECTOR-TO-KERNEL PyTorch"
