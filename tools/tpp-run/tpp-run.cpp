@@ -55,12 +55,15 @@
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
 #include "TPP/GPU/Utils.h"
+#include "TPP/Options/GpuOptions.h"
+#include "TPP/Options/PipelineOptions.h"
 #include "TPP/PassBundles.h"
 #include "TPP/Passes.h"
 
 #include <algorithm>
 
 using namespace mlir;
+using namespace mlir::tpp::opt;
 
 // Number of loops for benchmarks
 llvm::cl::opt<unsigned>
@@ -134,18 +137,6 @@ llvm::cl::opt<std::string> initType(
 llvm::cl::opt<bool> printLLVM("print-llvm",
                               llvm::cl::desc("print LLVM IR before lowering"),
                               llvm::cl::init(false));
-
-// Select target GPU backend for the pipeline.
-llvm::cl::opt<std::string>
-    defGpuBackend("gpu", llvm::cl::desc("Target GPU backend for lowering"),
-                  llvm::cl::value_desc("cuda,intel"), llvm::cl::init(""));
-
-// Kernel buffers - arguments and return values - are expected to be allocated
-// on GPU.
-llvm::cl::opt<bool>
-    defGpuArgs("gpu-args",
-               llvm::cl::desc("Kernel buffers are allocated on GPU"),
-               llvm::cl::init(true));
 
 // This function will be called by the pass manager after parsing,
 // so we can modify the IR with the needed wrappers

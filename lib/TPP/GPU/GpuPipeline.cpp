@@ -32,6 +32,7 @@
 #include "TPP/Dialect/Perf/BufferizableOpInterfaceImpl.h"
 #include "TPP/Dialect/Perf/PerfDialect.h"
 #include "TPP/Dialect/Xsmm/XsmmDialect.h"
+#include "TPP/Options/GpuOptions.h"
 #include "TPP/PassUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -40,34 +41,7 @@
 
 using namespace mlir;
 using namespace mlir::tpp;
-
-llvm::cl::list<int64_t>
-    gpuBlockTile("gpu-block-tile", llvm::cl::desc("GPU block tile size"),
-                 llvm::cl::list_init<int64_t>(SmallVector<int64_t>{128, 128}),
-                 llvm::cl::CommaSeparated);
-
-llvm::cl::list<int64_t>
-    gpuThreadTile("gpu-thread-tile", llvm::cl::desc("GPU thread tile size"),
-                  llvm::cl::list_init<int64_t>(SmallVector<int64_t>{32, 32}),
-                  llvm::cl::CommaSeparated);
-
-llvm::cl::opt<int64_t> kTile("k-tile", llvm::cl::desc("GEMM K dim tiling size"),
-                             llvm::cl::init(32));
-
-llvm::cl::opt<int64_t> stages("stages",
-                              llvm::cl::desc("GEMM coop prefetch stages"),
-                              llvm::cl::init(1));
-
-// DPAS size defaults to PVC.
-llvm::cl::list<int64_t>
-    gpuDpasTile("dpas-tile", llvm::cl::desc("DPAS register block sizes MxNxK"),
-                llvm::cl::list_init<int64_t>(SmallVector<int64_t>{8, 16, 16}),
-                llvm::cl::CommaSeparated);
-
-// Control GPU vectorization.
-llvm::cl::opt<bool> gpuVector("gpu-vector",
-                              llvm::cl::desc("Vectorize GPU kernel"),
-                              llvm::cl::init(false));
+using namespace mlir::tpp::opt;
 
 namespace mlir {
 namespace tpp {

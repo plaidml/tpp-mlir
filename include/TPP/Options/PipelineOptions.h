@@ -5,6 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// Collection of common CLI flags controlling lowering pipeline.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef TPP_OPTIONS_PIPELINEOPTIONS_H
 #define TPP_OPTIONS_PIPELINEOPTIONS_H

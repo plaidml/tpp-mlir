@@ -30,6 +30,7 @@ add_mlir_library(TPPGPU
     MLIRControlFlowToSPIRV
     MLIRMemRefTransforms
     TPPIR
+    TPPOptions
 )
 
 if (TPP_GPU MATCHES "cuda")

@@ -1,4 +1,5 @@
 add_mlir_library(TPPOptions
+  GpuOptions.cpp
   PipelineOptions.cpp
 
   ADDITIONAL_HEADER_DIRS
