@@ -37,7 +37,6 @@ llvm::cl::opt<bool>
 llvm::cl::list<unsigned>
     parallelTaskGrid("parallel-task-grid",
                      llvm::cl::desc("Grid-sizes for parallel tasks"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{2, 8}),
                      llvm::cl::CommaSeparated);
 
 llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
@@ -46,13 +45,13 @@ llvm::cl::opt<bool> linalgToVector("linalg-to-vector",
 
 llvm::cl::opt<bool>
     vectorToXSMM("def-vector-to-xsmm",
-                 llvm::cl::desc("Lower vector patterns to XSMM calls."),
+                 llvm::cl::desc("Default pipeline - lower vector to XSMM."),
                  llvm::cl::init(false));
 
-llvm::cl::opt<bool>
-    vectorToKernel("def-vector-to-kernel",
-                   llvm::cl::desc("Lower vector patterns to micro-kernels."),
-                   llvm::cl::init(false));
+llvm::cl::opt<bool> vectorToKernel(
+    "def-vector-to-kernel",
+    llvm::cl::desc("Default pipeline - lower vector to micro-kernels."),
+    llvm::cl::init(false));
 
 llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
     "lower-pack-unpack-without-transpose",
