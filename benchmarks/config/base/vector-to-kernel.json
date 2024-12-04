@@ -12,7 +12,7 @@
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=const --bias --relu --float-type=f32 --batch=256 --layers=1024,1024,1024,1024 --tiles=32,32,32" ],
       "environment": {},
-      "flags": [ "-n", "100"],
+      "flags": [ "-n", "100",  "-run-args='--def-parallel --vector-to-kernels --lhsTile=4,32 --rhsTile=32,1'" ],
       "extensions": []
     }
   }},
@@ -39,14 +39,14 @@
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=const --bias --relu --float-type=f32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='--vector-to-kernels --lhsTile=4,32 --rhsTile=32,1'" ],
+      "flags": [ "-n", "100", "-run-args='--def-parallel  --vector-to-kernels --lhsTile=4,32 --rhsTile=32,1'" ],
       "extensions": [ "(avx2|asimd)" ]
     },
     "fp32_3x1024_args_mlir": {
       "type": "IR-GEN",
       "benchmark": [ "mlir-gen", "--kernel=args --bias --relu --float-type=f32 --batch=256 --layers=1024,1024,1024,1024" ],
       "environment": {},
-      "flags": [ "-n", "100", "-run-args='--vector-to-kernels --lhsTile=4,32 --rhsTile=32,1'" ],
+      "flags": [ "-n", "100", "-run-args=' --def-parallel  --vector-to-kernels --lhsTile=4,32 --rhsTile=32,1'" ],
       "extensions": [ "(avx2|asimd)" ]
     }
   }}
