@@ -39,7 +39,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
-          ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=emr --time=0:30:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-EMR-OMP:
     runs-on: pcl-tiergarten
@@ -53,7 +53,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/github/benchmark.sh -o"
-          ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=emr --time=0:30:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-BASE:
     runs-on: pcl-tiergarten
@@ -65,7 +65,7 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
-          ${{ env.SRUN }} --partition=zen5 --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=zen5 --time=0:30:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-OMP:
     runs-on: pcl-tiergarten
@@ -77,4 +77,4 @@ jobs:
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/github/benchmark.sh -o"
-          ${{ env.SRUN }} --partition=zen5 --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=zen5 --time=0:30:00 --constraint=\"notrb\" -- $CMD
