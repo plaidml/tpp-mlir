@@ -158,6 +158,10 @@ static LogicalResult prepareMLIRKernel(Operation *op,
   // A set of default passes that lower any input IR to LLVM
   PassManager passManager(module.getContext());
 
+  // Propagate pass manager's command-line options.
+  if (failed(applyPassManagerCLOptions(passManager)))
+    return failure();
+
   tpp::TppRunnerWrapperOptions wrapperOpts;
   wrapperOpts.kernelName = options.mainFuncName;
   wrapperOpts.kernelType = options.mainFuncType;
@@ -275,6 +279,11 @@ int main(int argc, char **argv) {
   // Initialize GPU-related LLVM machinery
   tpp::initializeGpuTargets();
 
+  // Register all passes to expose them for debugging
+  mlir::registerAllPasses();
+  mlir::tpp::registerTppCompilerPasses();
+  mlir::tpp::registerTppPassBundlePasses();
+
   // Add the following to include *all* MLIR Core dialects, or selectively
   // include what you need like above. You only need to register dialects that
   // will be *parsed* by the tool, not the one generated
@@ -287,6 +296,10 @@ int main(int argc, char **argv) {
   registerAllToLLVMIRTranslations(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::tensor::registerTransformDialectExtension(registry);
+
+  // Add pass manager CLI debug options - exposes IR printing capabilities
+  // same as in opt tool
+  mlir::registerPassManagerCLOptions();
 
   // This is how we integrate with the pipeline
   JitRunnerConfig config;
