@@ -3,8 +3,8 @@ name: TPP-MLIR Benchmarks
 on:
   workflow_dispatch:
     inputs:
-      RUN_SPR_BENCH:
-        description: "Run on Sapphire Rapids"
+      RUN_EMR_BENCH:
+        description: "Run on Emerald Rapids"
         default: "1"
       RUN_ZEN_BENCH:
         description: "Run on Zen4"
@@ -33,33 +33,33 @@ jobs:
     uses: ./.github/workflows/tpp-llvm.yml
     secrets: inherit
 
-  TPP-MLIR-SPR-BASE:
+  TPP-MLIR-EMR-BASE:
     runs-on: pcl-tiergarten
     if: ${{ github.event_name }} == "push" || \
-        ${{ inputs.RUN_SPR_BENCH }} == 1 || \
+        ${{ inputs.RUN_EMR_BENCH }} == 1 || \
         (${{ github.event_name }} == "pull_request" && ${{ github.event.label.name == 'benchmark' }})
     needs: Check_LLVM
     steps:
       - uses: actions/checkout@v4
-      - name: Sapphire Rapids Base
+      - name: Emerald Rapids Base
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
-          ${{ env.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
-  TPP-MLIR-SPR-OMP:
+  TPP-MLIR-EMR-OMP:
     runs-on: pcl-tiergarten
     if: ${{ github.event_name }} == "push" || \
-        ${{ inputs.RUN_SPR_BENCH }} == 1 || \
+        ${{ inputs.RUN_EMR_BENCH }} == 1 || \
         (${{ github.event_name }} == "pull_request" && ${{ github.event.label.name == 'benchmark' }})
     needs: Check_LLVM
     steps:
       - uses: actions/checkout@v4
-      - name: Sapphire Rapids OpenMP
+      - name: Emerald Rapids OpenMP
         run: |-
           CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
                ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
-          ${{ env.SRUN }} --partition=spr --time=2:00:00 --constraint=\"notrb\" -- $CMD
+          ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-BASE:
     runs-on: pcl-tiergarten
