@@ -1,7 +1,7 @@
-// RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
+// RUN: tpp-run --vector-to-XSMM %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
 // RUN: tpp-run --linalg-to-loops %s -e entry -entry-point-result=void -print --seed 123 2>&1 | FileCheck %s
-// RUN: tpp-opt --default-tpp-passes="linalg-to-vector vector-to-xsmm" %s  -mlir-print-ir-after=vectorization-pass  2>&1  | FileCheck %s --check-prefix=VECTOR
-// RUN: tpp-run --linalg-to-vector --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s --check-prefix=XSMM
+// RUN: tpp-opt --default-tpp-passes="vector-to-xsmm" %s  -mlir-print-ir-after=vectorization-pass  2>&1  | FileCheck %s --check-prefix=VECTOR
+// RUN: tpp-run --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s --check-prefix=XSMM
 
 func.func @entry(%arg0 : tensor<4x4xbf16>, %arg1 : tensor<2x4x2xbf16>)-> tensor<2x4x2xbf16> {
   %expand_shape = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape[2, 2, 4]
