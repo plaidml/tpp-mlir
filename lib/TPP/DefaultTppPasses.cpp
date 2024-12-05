@@ -143,9 +143,6 @@ private:
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
         if (vectorToXSMM) {
-          if (printVector) {
-            pm.addPass(createPrintIRPass());
-          }
           pm.addPass(createVectorToXSMM());
         }
         if (vectorToKernel) {
