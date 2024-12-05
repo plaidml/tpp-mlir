@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script for Buildkite automation only.
+# Script for automation only.
 # Environment variables must have been declared already.
 #
 # CMake and build TPP-MLIR.
@@ -66,7 +66,7 @@ if [ "${CLEAN}" ]; then
 fi
 
 # Defaults when lacking CI environment
-PROJECT_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}
+PROJECT_DIR=${GITHUB_BUILD_CHECKOUT_PATH:-.}
 if [ ! "${PROJECT_DIR}" ]; then
   echo "PROJECT_DIR source path not set"
   exit 1

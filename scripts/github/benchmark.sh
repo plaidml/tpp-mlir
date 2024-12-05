@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script for Buildkite automation only.
+# Script for automation only.
 # Environment variables must have been declared already.
 #
 # Run long benchmarks after building TPP-MLIR.
@@ -57,18 +57,18 @@ if [ ! "$BENCH_BASE" ] && [ ! "$BENCH_PT" ] && [ ! "$BENCH_OMP" ] &&
   exit 1
 fi
 
-BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks
+BENCH_DIR=${GITHUB_BUILD_CHECKOUT_PATH:-.}/benchmarks
 BUILD_DIR=$(realpath "${BUILD_DIR:-build-${COMPILER}}")
 CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
 
 # CI jobs can make the run extra long
 NUM_ITER=100
-if [ "${BUILDKITE_BENCHMARK_NUM_ITER}" ]; then
-  NUM_ITER=${BUILDKITE_BENCHMARK_NUM_ITER}
+if [ "${BENCHMARK_NUM_ITER}" ]; then
+  NUM_ITER=${BENCHMARK_NUM_ITER}
 fi
 
 # Build
-eval "${SCRIPT_DIR}/buildkite/build_tpp.sh"
+eval "${SCRIPT_DIR}/github/build_tpp.sh"
 
 # Benchmark
 benchmark () {

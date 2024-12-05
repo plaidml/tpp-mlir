@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script for Buildkite automation only.
+# Script for automation only.
 # Environment variables must have been declared already.
 #
 # Check LLVM installation.

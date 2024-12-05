@@ -34,7 +34,7 @@ export LLVM_INSTALL_DIR=${LLVMROOT}/${LLVM_VERSION}
 export LLVM_TAR_DIR=${SOURCE_DIR}/llvm
 export LLVM_BUILD_DIR=${SOURCE_DIR}/llvm/build
 if [ ! -f "${LLVM_INSTALL_DIR}/bin/mlir-opt" ]; then
-  ${SCRIPT_DIR}/buildkite/build_llvm.sh
+  ${SCRIPT_DIR}/github/build_llvm.sh
 else
   echo "LLVM already built on ${LLVM_INSTALL_DIR}"
 fi
@@ -42,7 +42,7 @@ fi
 # Build TPP-MLIR
 export BUILDKITE_BUILD_CHECKOUT_PATH=${SOURCE_DIR}
 export BUILD_DIR=${SOURCE_DIR}/build-${COMPILER}
-${SCRIPT_DIR}/buildkite/build_tpp.sh
+${SCRIPT_DIR}/github/build_tpp.sh
 
 # Run benchmarks
 export BENCH_DIR=${BUILDKITE_BUILD_CHECKOUT_PATH:-.}/benchmarks

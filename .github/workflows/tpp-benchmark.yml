@@ -43,8 +43,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Emerald Rapids Base
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
           ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-EMR-OMP:
@@ -57,8 +57,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Emerald Rapids OpenMP
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -o"
           ${{ env.SRUN }} --partition=emr --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-BASE:
@@ -69,8 +69,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Zen4 Base
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
           ${{ env.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ZEN-OMP:
@@ -81,8 +81,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Zen4 OpenMP
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -o"
           ${{ env.SRUN }} --partition=zen4 --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-CLX-BASE:
@@ -93,8 +93,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Coffee Lake Base
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
           ${{ env.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-CLX-OMP:
@@ -105,8 +105,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Coffee Lake OpenMP
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -o"
           ${{ env.SRUN }} --partition=clxap --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ADL-BASE:
@@ -117,8 +117,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Raptor Lake Base
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -b -p"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -b -p"
           ${{ env.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD
 
   TPP-MLIR-ADL-OMP:
@@ -129,6 +129,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Raptor Lake OpenMP
         run: |-
-          CMD="KIND=Release COMPILER=clang LINKER=lld BUILDKITE_BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
-               ${{ github.workspace }}/scripts/buildkite/benchmark.sh -o"
+          CMD="KIND=Release COMPILER=clang LINKER=lld BENCHMARK_NUM_ITER=${{ env.NUM_ITER }} \
+               ${{ github.workspace }}/scripts/github/benchmark.sh -o"
           ${{ env.SRUN }} --partition=rpl --time=2:00:00 --constraint=\"notrb\" -- $CMD
