@@ -8,6 +8,7 @@
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
@@ -67,6 +68,17 @@ FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
     return lhsDim;
   }
   return failure();
+}
+
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
+  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector);
+}
+
+bool isInVnniLayout(int64_t expectedRank, VectorType vector) {
+  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16()) {
+    return false;
+  }
+  return vector.getShape().back() == vnni::utils::getVnniBlockingFactor(vector);
 }
 
 } // namespace utils

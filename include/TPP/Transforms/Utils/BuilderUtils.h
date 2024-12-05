@@ -29,8 +29,8 @@ class FuncOp;
 // Creates a function, its entry basic block and sets the entry point
 // inside that block
 func::FuncOp createFunction(OpBuilder &builder, ModuleOp module,
-                            llvm::StringRef name, TypeRange args,
-                            TypeRange ret);
+                            llvm::StringRef name, TypeRange args, TypeRange ret,
+                            bool createBody = true);
 
 // Create a local constant dense tensor
 Value createDenseTensor(OpBuilder &, TensorInitType, TensorType, int);

@@ -90,8 +90,11 @@ private:
     if (linalgToVector) {
       skipOperations.push_back("all");
     }
-    if (vectorToXSMM)
+    if (vectorToXSMM) {
       skipOperations.clear();
+      skipOperations.push_back("transpose");
+      skipOperations.push_back("vnni");
+    }
     if (vectorToKernel)
       skipOperations.clear();
 
@@ -139,7 +142,6 @@ private:
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
         pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-
         if (vectorToXSMM) {
           pm.addPass(createVectorToXSMM());
         }
