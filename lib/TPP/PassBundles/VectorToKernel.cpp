@@ -13,6 +13,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "TPP/PassBundles.h"
 #include "TPP/PassUtils.h"
@@ -48,6 +49,8 @@ struct VectorToKernel : public tpp::impl::VectorToKernelBase<VectorToKernel>,
 
 private:
   void constructPipeline() override {
+    pm.addNestedPass<func::FuncOp>(createHoistVectorTransfers());
+    pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     pm.addNestedPass<func::FuncOp>(createVectorContractToFMA());
   }
 };
