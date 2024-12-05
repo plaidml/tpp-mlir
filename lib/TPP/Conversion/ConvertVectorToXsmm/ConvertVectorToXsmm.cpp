@@ -21,7 +21,6 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/Debug.h"
-#include <iostream>
 using namespace mlir;
 using namespace mlir::xsmm;
 
