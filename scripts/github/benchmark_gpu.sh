@@ -9,7 +9,7 @@
 SCRIPT_DIR=$(realpath "$(dirname "$0")/..")
 source "${SCRIPT_DIR}/ci/common.sh"
 
-BENCH_DIR=${GITHUB_BUILD_CHECKOUT_PATH:-.}/benchmarks
+BENCH_DIR=benchmarks
 BUILD_DIR=$(realpath "${BUILD_DIR:-build-${COMPILER}}")
 CONFIG_DIR=$(realpath "${BENCH_DIR}/config")
 

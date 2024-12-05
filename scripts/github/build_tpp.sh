@@ -66,11 +66,7 @@ if [ "${CLEAN}" ]; then
 fi
 
 # Defaults when lacking CI environment
-PROJECT_DIR=${GITHUB_BUILD_CHECKOUT_PATH:-.}
-if [ ! "${PROJECT_DIR}" ]; then
-  echo "PROJECT_DIR source path not set"
-  exit 1
-fi
+PROJECT_DIR=.
 if [ ! "${BUILD_DIR}" ]; then
   BUILD_DIR="build-${COMPILER}"
 fi
