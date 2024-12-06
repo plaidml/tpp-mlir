@@ -87,7 +87,7 @@ private:
     SmallVector<std::string> skipOperations;
     // General "linalg-to-vector" choice needs to skip all XSMM matching at
     // linalg level.
-    if (linalgToVector) {
+    if (linalgToVector || vectorToKernel) {
       skipOperations.push_back("all");
     }
     if (vectorToXSMM) {
@@ -95,8 +95,6 @@ private:
       skipOperations.push_back("transpose");
       skipOperations.push_back("vnni");
     }
-    if (vectorToKernel)
-      skipOperations.clear();
 
     // Pipeline building starts here.
     pm.addPass(createFoldAddIntoDest());
@@ -141,8 +139,12 @@ private:
             BrgemmLinalgTilingOptions{lhsTile, rhsTile}));
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
-        pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-        if (vectorToXSMM) {
+
+	//Please note, canonicalizer should be after hoisting pass because 
+	//it fuses outer tiling loops and it results in no pattern 
+	//matching for hoisting pass. Moved inside VectorToKernel Path.
+        
+	if (vectorToXSMM) {
           pm.addPass(createVectorToXSMM());
         }
         if (vectorToKernel) {
@@ -187,3 +189,4 @@ private:
 };
 
 } // namespace
+
