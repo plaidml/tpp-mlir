@@ -8,17 +8,59 @@
 
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
 #include "TPP/Dialect/Xsmm/XsmmOps.h"
+#include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 
+#include "TPP/Transforms/Utils/BuilderUtils.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Compiler.h"
+#include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "xsmm-utils"
+
 namespace mlir {
 namespace xsmm {
 namespace utils {
+
+// Examples:
+// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
+// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
+// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
+// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
+// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
+static void
+computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
+                       ArrayRef<int64_t> lowerRankShape,
+                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
+  // Initialize new shapes with [1] * higherRank.
+  int64_t higherRank = higherRankShape.size();
+  int64_t lowerRank = lowerRankShape.size();
+
+  reshapeOutputShape.assign(higherRank, 1);
+
+  int64_t higherRankDim;
+  int64_t lowerRankDim;
+
+  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
+       i--, j--) {
+    higherRankDim = higherRankShape[i];
+    lowerRankDim = lowerRankShape[j];
+
+    if (lowerRankDim == 1 && higherRankDim > 1)
+      reshapeOutputShape[i] = 1;
+    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
+             (lowerRankDim == higherRankDim)) {
+      reshapeOutputShape[i] = lowerRankDim;
+    } else if (higherRankDim != lowerRankDim) {
+      llvm_unreachable("bCast semantics for identity op broken");
+    }
+  }
+}
 
 DataTypeAttr getDataType(RewriterBase &rewriter, Type type) {
   auto elemType = getElementTypeOrSelf(type);
@@ -91,6 +133,51 @@ FailureOr<UnaryInfo> getUnaryInfo(Value input, Value output,
   return unaryInfo;
 }
 
+FailureOr<UnaryInfo>
+getVectorUnaryInfo(MemRefType shapedType, MemRefType inputType,
+                   MemRefType outputType, VectorType inputVectorType,
+                   VectorType outputVectorType, UnaryFlags inputFlag) {
+
+  UnaryInfo unaryInfo;
+
+  unaryInfo.m = shapedType.getShape()[0];
+  unaryInfo.n = shapedType.getShape()[1];
+
+  auto getStrideLoc = [&](MemRefType inputType) -> FailureOr<int64_t> {
+    int64_t strideAtLoc;
+    SmallVector<int64_t> strides;
+    int64_t offset;
+
+    if (failed(getStridesAndOffset(inputType, strides, offset)))
+      return failure();
+    strideAtLoc = strides[0];
+    return strideAtLoc;
+  };
+
+  auto strideLdi = getStrideLoc(inputType);
+  if (failed(strideLdi))
+    return failure();
+  unaryInfo.ldi = *strideLdi;
+  int ldo = 1;
+  // If we are broascasting a row into cols, the leading
+  // dimension is 1, same for scalar broadcast.
+  if (inputFlag == UnaryFlags::BCAST_ROW ||
+      inputFlag == UnaryFlags::BCAST_SCALAR)
+    ldo = 1;
+  // If we are broascasting a col into rows, the leading
+  // dimension is the size of the tensor.
+  else if (inputFlag == UnaryFlags::BCAST_COL)
+    ldo = inputVectorType.getShape()[0];
+  else {
+    auto strideLdo = getStrideLoc(outputType);
+    if (failed(strideLdo))
+      return failure();
+    ldo = *strideLdo;
+  }
+  unaryInfo.ldo = ldo;
+  return unaryInfo;
+}
+
 FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
                                     BinaryFlags rhsFlag, Value output) {
   Type outputType = output.getType();
@@ -152,40 +239,6 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
   return binaryInfo;
 }
 
-// Examples:
-// If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
-// If lower=[b, c], higher=[a, b, c], [b, c] reshaped into [1, b, c].
-// If lower=[a], higher=[a, a], [a] reshaped into [1, a].
-// If lower=[a], target=[a, b, a], [a] reshaped into [1, 1, a].
-// If lower=[], target=[a, b, c], [] reshaped into [1, 1, 1].
-static void
-computeBcastShapeInput(ArrayRef<int64_t> higherRankShape,
-                       ArrayRef<int64_t> lowerRankShape,
-                       SmallVectorImpl<int64_t> &reshapeOutputShape) {
-  // Initialize new shapes with [1] * higherRank.
-  int64_t higherRank = higherRankShape.size();
-  int64_t lowerRank = lowerRankShape.size();
-
-  reshapeOutputShape.assign(higherRank, 1);
-
-  int64_t higherRankDim;
-  int64_t lowerRankDim;
-
-  for (int64_t i = higherRank - 1, j = lowerRank - 1; i >= 0 && j >= 0;
-       i--, j--) {
-    higherRankDim = higherRankShape[i];
-    lowerRankDim = lowerRankShape[j];
-
-    if (lowerRankDim == 1 && higherRankDim > 1)
-      reshapeOutputShape[i] = 1;
-    else if ((lowerRankDim > 1 && higherRankDim == 1) ||
-             (lowerRankDim == higherRankDim))
-      reshapeOutputShape[i] = lowerRankDim;
-    else if (higherRankDim != lowerRankDim)
-      assert(false && "bCast semantics for identity op broken");
-  }
-}
-
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(isa<ShapedType>(outputType) && "expect shaped type on output");
   assert(cast<ShapedType>(outputType).getRank() == 2 &&
@@ -214,7 +267,8 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   if (llvm::all_of(shapeInput, isOne))
     return xsmm::UnaryFlags::BCAST_SCALAR;
 
-  if (shapeInput[1] == 1 && shapeOutput[1] > 1)
+  if (shapeInput[shapeInput.size() - 1] == 1 &&
+      shapeOutput[shapeInput.size() - 1] > 1)
     return xsmm::UnaryFlags::BCAST_ROW;
 
   if (shapeInput[0] == 1 && shapeOutput[0] > 1)
@@ -285,6 +339,86 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
     return getBCastEnum(BCastType::COL, operandNumber);
 
   return failure();
+}
+
+SmallVector<Type> extractOperandTypes(OpBuilder &builder,
+                                      SmallVector<XsmmOperand> operands) {
+  SmallVector<Type> results;
+  for (XsmmOperand operand : operands) {
+    if (std::holds_alternative<int64_t>(operand))
+      results.push_back(IntegerType::get(builder.getContext(), 64));
+    else if (std::holds_alternative<Value>(operand)) {
+      Value valueOperand = std::get<Value>(operand);
+      if (isa<MemRefType>(valueOperand.getType())) {
+        Type basePtrType = LLVM::LLVMPointerType::get(builder.getContext());
+        results.push_back(basePtrType);
+        results.push_back(builder.getIndexType()); // offset
+      }
+    } else if (std::holds_alternative<XsmmCall>(operand)) {
+      XsmmCall callOperand = std::get<XsmmCall>(operand);
+      if (callOperand.CallType == XsmmCallType::DISPATCH) {
+        results.push_back(callOperand.CallResult.getType());
+      } else {
+        llvm_unreachable("Unknown XSMM function type");
+      }
+    }
+  }
+  return results;
+}
+
+SmallVector<Value> getXsmmOperands(OpBuilder &builder, Location loc,
+                                   SmallVector<XsmmOperand> operands,
+                                   IntegerAttr dataTypeAttr,
+                                   Operation *parentOp) {
+  SmallVector<Value> res;
+  for (XsmmOperand operand : operands) {
+    if (std::holds_alternative<int64_t>(operand))
+      res.push_back(getConstInt(builder, std::get<int64_t>(operand), 64));
+    else if (std::holds_alternative<Value>(operand)) {
+      Value valueOperand = std::get<Value>(operand);
+      if (isa<MemRefType>(valueOperand.getType())) {
+        auto [ptr, offset] = ::mlir::utils::getPtrAndOffset(
+            builder, std::get<Value>(operand), loc);
+        res.push_back(ptr);
+        res.push_back(offset);
+      }
+    } else if (std::holds_alternative<XsmmCall>(operand)) {
+      XsmmCall callOperand = std::get<XsmmCall>(operand);
+      if (callOperand.CallType == XsmmCallType::DISPATCH) {
+        res.push_back(callOperand.CallResult);
+      } else {
+        llvm_unreachable("Unknown XSMM function type");
+      }
+    }
+  }
+  return res;
+}
+
+func::CallOp buildXsmmCall(RewriterBase &rewriter, XsmmCallType callType,
+                           Location loc, DataTypeAttr dtype,
+                           SmallVector<XsmmOperand> operands, TypeRange results,
+                           FlatSymbolRefAttr fnName, Operation *parentOp,
+                           Operation *insertBefore) {
+  auto module = parentOp->getParentOfType<ModuleOp>();
+  OpBuilder::InsertionGuard guard(rewriter);
+
+  auto operandTypes = xsmm::utils::extractOperandTypes(rewriter, operands);
+  createFunction(rewriter, module, fnName.getValue(), operandTypes, results,
+                 false);
+  if (callType == XsmmCallType::INVOKE) {
+    assert(insertBefore != NULL);
+    rewriter.setInsertionPoint(insertBefore);
+  } else if (callType == XsmmCallType::DISPATCH) {
+    auto functionOp = parentOp->getParentOfType<func::FuncOp>();
+    rewriter.setInsertionPointAfter(&*functionOp.getBlocks().begin()->begin());
+  } else {
+    llvm_unreachable("Unknown XSMM function type");
+  }
+
+  SmallVector<Value> finalOperands =
+      xsmm::utils::getXsmmOperands(rewriter, loc, operands, dtype, parentOp);
+  return rewriter.create<func::CallOp>(loc, fnName.getValue(), results,
+                                       finalOperands);
 }
 
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
@@ -402,28 +536,6 @@ FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op) {
   }
 
   return fusedMatch;
-}
-
-FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
-  // Not shaped type, the leading dimension is the single scalar.
-  auto memref = dyn_cast<MemRefType>(type);
-  if (!memref)
-    return 1;
-  // For 1d memref we cannot use the stride as leading dimension, but the
-  // leading dimension is the dimension itself.
-  if (memref.getRank() == 1)
-    return memref.getShape()[0];
-
-  SmallVector<int64_t> strides;
-  int64_t offset;
-  if (failed(getStridesAndOffset(memref, strides, offset)))
-    return failure();
-  // fail if the strides are non-constant
-  if (llvm::any_of(strides, [](int64_t stride) {
-        return stride == ShapedType::kDynamic;
-      }))
-    return failure();
-  return strides[pos];
 }
 
 template <typename DispatchOpTy>

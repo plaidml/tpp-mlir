@@ -19,6 +19,7 @@ class MemRefType;
 class OpOperand;
 class AffineDimExpr;
 class AffineMap;
+class VectorType;
 
 namespace linalg {
 class GenericOp;
@@ -39,6 +40,11 @@ std::optional<int64_t> getVnniBlockingFactor(Type type);
 
 // Return true if the memref is in VNNI layout with rank `expectedRank`.
 bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref);
+
+// Return true if the vector is in VNNI layout with rank `expectedRank`.
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector);
+
+bool isInVnniLayout(int64_t expectedRank, VectorType vector);
 
 // Return the first AffineDimExpr in the map `affineMap`
 // with a VNNI layout pattern (AffineDimExpr floordiv VNNI).

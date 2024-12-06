@@ -107,6 +107,7 @@ struct VectorizationPass
 
   void populateCombinePatterns(RewritePatternSet &patterns) {
     patterns.add<LinalgToVector<linalg::BatchReduceMatmulOp>,
+                 LinalgToVector<linalg::TransposeOp>,
                  LinalgToVector<linalg::FillOp>>(patterns.getContext());
     patterns.add<LinalgGenericToVector>(patterns.getContext());
   }

@@ -87,14 +87,13 @@ private:
     SmallVector<std::string> skipOperations;
     // General "linalg-to-vector" choice needs to skip all XSMM matching at
     // linalg level.
-    if (linalgToVector) {
+    if (linalgToVector || vectorToKernel) {
       skipOperations.push_back("all");
     }
-    if (vectorToXSMM)
+    if (vectorToXSMM) {
       skipOperations.clear();
-    
-    if (vectorToKernel && !linalgToVector) {
-	 skipOperations.push_back("all");
+      skipOperations.push_back("transpose");
+      skipOperations.push_back("vnni");
     }
 
     // Pipeline building starts here.
@@ -141,7 +140,11 @@ private:
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
 
-        if (vectorToXSMM) {
+	//Please note, canonicalizer should be after hoisting pass because 
+	//it fuses outer tiling loops and it results in no pattern 
+	//matching for hoisting pass. Moved inside VectorToKernel Path.
+        
+	if (vectorToXSMM) {
           pm.addPass(createVectorToXSMM());
         }
         if (vectorToKernel) {

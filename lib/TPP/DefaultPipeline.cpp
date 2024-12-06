@@ -68,17 +68,19 @@ llvm::cl::opt<bool> lowerPackUnpackWithoutTranspose(
 
 // Lhs tile sizes for linalg-to-vector.
 llvm::cl::list<unsigned>
-    lhsTile("lhsTile",
-                     llvm::cl::desc("Lhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{4, 32}),
-                     llvm::cl::CommaSeparated);
+    lhsTile("lhsTile", llvm::cl::desc("Lhs tile size for brgemm operation"),
+            llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 8}),
+            llvm::cl::CommaSeparated);
 
 // Rhs tile sizes for linalg-to-vector
 llvm::cl::list<unsigned>
-    rhsTile("rhsTile",
-                     llvm::cl::desc("Rhs tile size for brgemm operation"),
-                     llvm::cl::list_init<unsigned>(SmallVector<unsigned>{32, 1}),
-                     llvm::cl::CommaSeparated);
+    rhsTile("rhsTile", llvm::cl::desc("Rhs tile size for brgemm operation"),
+            llvm::cl::list_init<unsigned>(SmallVector<unsigned>{8, 16}),
+            llvm::cl::CommaSeparated);
+
+llvm::cl::opt<bool> vectorToXSMM("vector-to-XSMM",
+                                 llvm::cl::desc("Lower vector to XSMM"),
+                                 llvm::cl::init(false));
 
 namespace mlir {
 namespace tpp {
@@ -151,14 +153,16 @@ private:
       pm.addPass(createGpuPipeline(GpuPipelineOptions{gpuBackend}));
     } else {
       // Apply the default preprocessing pass
-      DefaultTppPassesOptions tppDefaultOptions; 
-          tppDefaultOptions.linalgToLoops = linalgToLoops;
-	  tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
-	  tppDefaultOptions.linalgToVector = linalgToVector;
-          tppDefaultOptions.lowerPackUnpackWithoutTranspose = lowerPackUnpackWithoutTranspose;
-	  tppDefaultOptions.lhsTile = lhsTile;
-	  tppDefaultOptions.rhsTile = rhsTile;
-	  tppDefaultOptions.vectorToKernel = vectorToKernel;
+      DefaultTppPassesOptions tppDefaultOptions;
+      tppDefaultOptions.linalgToLoops = linalgToLoops;
+      tppDefaultOptions.parallelTaskGrid = parallelTaskGrid;
+      tppDefaultOptions.linalgToVector = linalgToVector;
+      tppDefaultOptions.vectorToXSMM = vectorToXSMM;
+      tppDefaultOptions.lowerPackUnpackWithoutTranspose =
+          lowerPackUnpackWithoutTranspose;
+      tppDefaultOptions.lhsTile = lhsTile;
+      tppDefaultOptions.rhsTile = rhsTile;
+      tppDefaultOptions.vectorToKernel = vectorToKernel;
 
       pm.addPass(createDefaultTppPasses(tppDefaultOptions));
     }

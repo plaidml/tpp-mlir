@@ -28,23 +28,16 @@ Scripts to CMake and build the project, run benchmarks etc.
 These should be generic to all environments, including developers' own machines.
 Given the appropriate dependencies are installed, these should work everywhere.
 
-## Buildkite
+## Github
 
-Scripts executed by the Buildkite CI. There should be one script per rule, used by all different builds.
-
-There are two types of scripts:
-
-* YAML: Pipeline descrptions that the buildkite-agent will upload.
-* BASH: Scripts that the YAML rules will call.
-
-There should be no code in the YAML files. Bash scripts can depend on and reuse generic CI-scripts.
+Scripts executed by the Github CI. There should be one script per rule, used by all different builds.
 
 To run local tests like in the CI-environment (relies at least on the TPP-environment):
 
 ```bash
 cd tpp-mlir
 source scripts/env.sh
-KIND=Debug COMPILER=clang LINKER=lld CHECK=1 GPU=cuda CLEAN=1 scripts/buildkite/build_tpp.sh
+KIND=Debug COMPILER=clang LINKER=lld CHECK=1 GPU=cuda CLEAN=1 scripts/github/build_tpp.sh
 ```
 
 Above scripts (scripts/env.sh) must be sourced from inside of the tpp-mlir directory (Git repository).
