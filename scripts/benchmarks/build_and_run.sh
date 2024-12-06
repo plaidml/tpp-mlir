@@ -57,12 +57,6 @@ echo_run ./driver.py -vv \
          -c "${CONFIG_DIR}/base/base.json" \
          --build "${BUILD_DIR}"
 
-echo " ========= Vector-to-kernel  Base Benchmarks ==========="
-echo_run ./driver.py -vv \
-         -n ${NUM_ITER} \
-         -c "${CONFIG_DIR}/base/vector-to-kernel.json" \
-         --build "${BUILD_DIR}"
-
 echo " ========= PyTorch Benchmarks ==========="
 echo_run ./driver.py -vv \
          -n ${NUM_ITER} \

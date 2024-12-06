@@ -82,7 +82,6 @@ set(CONFIG_DIR "${BENCHMARK_DIR}/config")
 # Run baseline benchmarks with default iterations to track simple performance
 set(BENCH_CFGS
   ${CONFIG_DIR}/base/base.json
-  ${CONFIG_DIR}/base/vector-to-kernel.json
   ${CONFIG_DIR}/base/pack.json
   ${CONFIG_DIR}/base/mha.json
   ${CONFIG_DIR}/base/named-ops.json
