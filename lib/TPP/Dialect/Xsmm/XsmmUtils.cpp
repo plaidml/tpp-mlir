@@ -140,23 +140,31 @@ getVectorUnaryInfo(MemRefType shapedType, MemRefType inputType,
 
   UnaryInfo unaryInfo;
 
-  unaryInfo.m = shapedType.getShape()[0];
-  unaryInfo.n = shapedType.getShape()[1];
+  unaryInfo.m = 1;
+  for (unsigned i = 0; i < shapedType.getShape().size() - 1; i++) {
+    unaryInfo.m *= shapedType.getShape()[i];
+  }
+  unaryInfo.n = shapedType.getShape()[shapedType.getShape().size() - 1];
 
-  auto getStrideLoc = [&](MemRefType inputType) -> FailureOr<int64_t> {
+  auto getStrideLoc = [&](MemRefType memrefType) -> FailureOr<int64_t> {
     int64_t strideAtLoc;
     SmallVector<int64_t> strides;
     int64_t offset;
 
-    if (failed(getStridesAndOffset(inputType, strides, offset)))
+    if (failed(getStridesAndOffset(memrefType, strides, offset))) {
       return failure();
+    }
+    if (strides.empty()) {
+      return failure();
+    }
     strideAtLoc = strides[0];
     return strideAtLoc;
   };
 
   auto strideLdi = getStrideLoc(inputType);
-  if (failed(strideLdi))
+  if (failed(strideLdi)) {
     return failure();
+  }
   unaryInfo.ldi = *strideLdi;
   int ldo = 1;
   // If we are broascasting a row into cols, the leading
@@ -166,12 +174,16 @@ getVectorUnaryInfo(MemRefType shapedType, MemRefType inputType,
     ldo = 1;
   // If we are broascasting a col into rows, the leading
   // dimension is the size of the tensor.
-  else if (inputFlag == UnaryFlags::BCAST_COL)
-    ldo = inputVectorType.getShape()[0];
-  else {
+  else if (inputFlag == UnaryFlags::BCAST_COL) {
+    if (inputVectorType.getShape().size() == 0)
+      ldo = 1;
+    else
+      ldo = inputVectorType.getShape()[0];
+  } else {
     auto strideLdo = getStrideLoc(outputType);
-    if (failed(strideLdo))
+    if (failed(strideLdo)) {
       return failure();
+    }
     ldo = *strideLdo;
   }
   unaryInfo.ldo = ldo;
@@ -241,8 +253,6 @@ FailureOr<BinaryInfo> getBinaryInfo(Value lhs, BinaryFlags lhsFlag, Value rhs,
 
 FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   assert(isa<ShapedType>(outputType) && "expect shaped type on output");
-  assert(cast<ShapedType>(outputType).getRank() == 2 &&
-         "expect rank 2 on output");
 
   if (!isa<ShapedType>(inputType) ||
       cast<ShapedType>(inputType).getRank() == 0) {

@@ -9,6 +9,11 @@ Rewrite ConvertTranspose(op:Op<vector.transpose>, input0:Op<vector.transfer_read
 
 Constraint ValidateTranspose(op:Op<vector.transpose>, input0:Op<vector.transfer_read>, output:Op<vector.transfer_write>, outputType:TypeRange);
 
+
+Rewrite ConvertBroadcast(op:Op<vector.broadcast>, input:Op<vector.transfer_read>,  output:Op<vector.transfer_write>)->(dispatch:Op<func.callOp>, invoke:Op<func.callOp>);
+
+Constraint ValidateBroadcast(op:Op<vector.broadcast>, input0:Op<vector.transfer_read>, output:Op<vector.transfer_write>);
+
 Pattern ConvertTransposePattern{
      let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex:ValueRange)->(output:TypeRange);
      let transpose = op<vector.transpose>(input0)->(transposeOutput0:Type);
@@ -19,4 +24,17 @@ Pattern ConvertTransposePattern{
         replace transpose with (replacement.dispatch, replacement.invoke);
         erase output0;
      };
+}
+
+Pattern ConvertBroadcastPattern{
+     let input0 = op<vector.transfer_read>(alloc0:Value, indices0:ValueRange, const0:Value, constIndex:ValueRange)->(output:TypeRange);
+     let broadcast = op<vector.broadcast>(input0)->(broadcastOutput0:Type);
+     let output0 = op<vector.transfer_write>(broadcast, alloc1:Value, outindices:ValueRange, constIndex2:ValueRange)->(typeRange:TypeRange);
+     ValidateBroadcast(broadcast, input0, output0);
+     rewrite broadcast with{
+        let replacement = ConvertBroadcast(broadcast, input0, output0);
+        replace broadcast with (replacement.dispatch, replacement.invoke);
+        erase output0;
+     };
+
 }
