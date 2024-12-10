@@ -419,7 +419,7 @@ func.func @binary_invoke(%arg1: memref<3x3xf32>) {
 // -----
 
 func.func @binary_invoke(%arg0: i64, %arg1: memref<3x3xf32>) {
-  // expected-error@+1 {{operands present, but expected 5}}
+  // expected-error@+1 {{custom op 'xsmm.binary' number of operands and types do not match: got 6 operands and 5 types}}
   xsmm.binary add(data_type = f32, %arg0, %arg1, %arg1, %arg1, %arg1, %arg1)
     : (i64, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>, memref<3x3xf32>) -> ()
   return
