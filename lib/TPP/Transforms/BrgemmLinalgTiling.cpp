@@ -223,7 +223,9 @@ struct BrgemmLinalgTiling : public tpp::impl::BrgemmLinalgTilingBase<BrgemmLinal
   using BrgemmLinalgTilingBase::BrgemmLinalgTilingBase;
 
   void runOnOperation() override {
-    BrgemmLinalgTilingOptions options{mTileShape, nTileShape};
+    BrgemmLinalgTilingOptions options;
+    options.mTileShape = SmallVector<unsigned>{*mTileShape};
+    options.nTileShape = SmallVector<unsigned>{*nTileShape};
     RewritePatternSet patterns(&getContext());
     populateBrgemmLinalgTilingPatterns(patterns, options);
     GreedyRewriteConfig config;

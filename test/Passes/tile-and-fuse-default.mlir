@@ -733,7 +733,7 @@ func.func @contraction(%arg0: tensor<16x1xf32>, %arg1: tensor<1x32xf32>) -> tens
 // -----
 
 // CHECK-LABEL: dlti_tile_size_32
-module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 32 : i32>>> } {
+module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 32 : i32>>> } {
   func.func @dlti_tile_size_32(%arg0: tensor<2048x2048xf32>, %arg1: tensor<2048x2048xf32>, %arg2: tensor<2048x2048xf32>)
       -> tensor<2048x2048xf32> {
     // CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
@@ -751,7 +751,7 @@ module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" : #
 // -----
 
 // CHECK-LABEL: dlti_tile_size_64
-module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 64 : i32>>> } {
+module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 64 : i32>>> } {
   func.func @dlti_tile_size_64(%arg0: tensor<2048x2048xf32>, %arg1: tensor<2048x2048xf32>, %arg2: tensor<2048x2048xf32>)
       -> tensor<2048x2048xf32> {
     // CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
@@ -770,7 +770,7 @@ module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" : #
 // -----
 
 // CHECK-LABEL: dlti_tile_size_16
-module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 16 : i32>>> } {
+module attributes { dlti.target_system_spec = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 16 : i32>>> } {
   func.func @dlti_tile_size_16(%arg0: tensor<2048x2048xf32>, %arg1: tensor<2048x2048xf32>, %arg2: tensor<2048x2048xf32>)
       -> tensor<2048x2048xf32> {
     // CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index

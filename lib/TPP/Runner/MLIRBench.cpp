@@ -351,8 +351,8 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
     outerDim = outputType.getShape()[0];
 
   // Vector undefined value
-  Value minusOne = builder.create<arith::ConstantOp>(
-      unkLoc, getTypedAttr(builder, outElmType, -1.0));
+  Value undefLengthCst = builder.create<arith::ConstantOp>(
+      unkLoc, getTypedAttr(builder, outElmType, 0.0));
 
   // Loop through the shaped type, transfer each dim to vector
   auto count = getConstIndex(builder, outerDim);
@@ -364,7 +364,7 @@ LogicalResult MLIRBench::printShapedType(mlir::Value val) {
   // Loop body
   auto beginIdx = loop.getInductionVar();
   auto vector = builder.create<vector::TransferReadOp>(
-      unkLoc, vecType, val, ValueRange{beginIdx, zero}, minusOne);
+      unkLoc, vecType, val, ValueRange{beginIdx, zero}, undefLengthCst);
   printVector(vector);
 
   // Finally lower to LLVM Dialect

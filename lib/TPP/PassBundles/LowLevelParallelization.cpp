@@ -63,7 +63,7 @@ private:
     pm.addPass(createCleanup());
 
     mlir::tpp::SCFParallelLoopTilingOptions tilingOptions;
-    tilingOptions.tileSizes = parallelTaskGrid;
+    tilingOptions.tileSizes = SmallVector<unsigned>{*parallelTaskGrid};
     pm.addPass(createSCFParallelLoopTiling(tilingOptions));
   }
 };

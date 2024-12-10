@@ -14,15 +14,15 @@ module {
     // Kernel arguments are allocated on host
     // Copy data to device
     %0, %t0 = gpu.alloc async () : memref<8x8xf32>
-    %a0 = bufferization.to_memref %arg0 : memref<8x8xf32>
+    %a0 = bufferization.to_memref %arg0 : tensor<8x8xf32> to memref<8x8xf32>
     %t1 = gpu.memcpy async [%t0] %0, %a0 : memref<8x8xf32>, memref<8x8xf32>
     gpu.wait [%t1]
     %1, %t2 = gpu.alloc async () : memref<8x8xf32>
-    %a1 = bufferization.to_memref %arg1 : memref<8x8xf32>
+    %a1 = bufferization.to_memref %arg1 : tensor<8x8xf32> to memref<8x8xf32>
     %t3 = gpu.memcpy async [%t2] %1, %a1 : memref<8x8xf32>, memref<8x8xf32>
     gpu.wait [%t3]
     %2, %t4 = gpu.alloc async () : memref<8x8xf32>
-    %a2 = bufferization.to_memref %arg2 : memref<8x8xf32>
+    %a2 = bufferization.to_memref %arg2 : tensor<8x8xf32> to memref<8x8xf32>
     %t5 = gpu.memcpy async [%t4] %2, %a2 : memref<8x8xf32>, memref<8x8xf32>
     gpu.wait [%t5]
 
@@ -46,7 +46,7 @@ module {
     %tD2 = gpu.dealloc async %2 : memref<8x8xf32>
     gpu.wait [%tD2]
 
-    %outTensor = bufferization.to_tensor %out restrict : memref<8x8xf32>
+    %outTensor = bufferization.to_tensor %out restrict : memref<8x8xf32> to tensor<8x8xf32>
 
     return %outTensor : tensor<8x8xf32>
   }

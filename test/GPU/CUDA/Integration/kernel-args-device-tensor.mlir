@@ -13,7 +13,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module attributes {
   "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    : #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
+    = #dlti.target_device_spec<#dlti.dl_entry<"tile_size", 4 : i32>>>
 } {
   func.func @entry(%arg0: tensor<8x8xf32> {bufferization.writable = true},
                    %arg1: tensor<8x8xf32> {bufferization.writable = true},

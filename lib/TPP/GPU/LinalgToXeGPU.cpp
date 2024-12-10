@@ -512,8 +512,9 @@ createGemmCoopPrefetchTile(PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
 
   auto srcType = cast<ShapedType>(src.getType());
 
-  auto prefetchType =
-      xegpu::TensorDescType::get({numRows, numCols}, srcType.getElementType());
+  auto prefetchType = xegpu::TensorDescType::get(
+      {numRows, numCols}, srcType.getElementType(), /*array_length=*/1,
+      /*boundary_check=*/true);
 
   Value threadId = getGpuLinearThreadId(rewriter, loc);
 
@@ -620,7 +621,9 @@ static SmallVector<Value> createDescriptorTiles(PatternRewriter &rewriter,
   assert(arrayLength == 1 && "Array descriptors are not supported");
 
   auto type = cast<ShapedType>(src.getType());
-  auto descType = xegpu::TensorDescType::get(descTile, type.getElementType());
+  auto descType = xegpu::TensorDescType::get(descTile, type.getElementType(),
+                                             /*array_length=*/1,
+                                             /*boundary_check=*/true);
 
   // Create the root descriptor.
   //
@@ -868,8 +871,9 @@ static LogicalResult createDPASKernel(linalg::LinalgOp linalgOp,
   int dimK = typeA.getShape().back();
 
   // Create C sub-tiles.
-  auto dpasTypeC = xegpu::TensorDescType::get({dpasTileM, dpasTileN},
-                                              typeC.getElementType());
+  auto dpasTypeC = xegpu::TensorDescType::get(
+      {dpasTileM, dpasTileN}, typeC.getElementType(), /*array_length=*/1,
+      /*boundary_check=*/true);
   SmallVector<Value> tilesC = createDescriptorTiles(
       rewriter, loc, matC, typeC.getShape(), {0, 0}, dpasTypeC.getShape());
 
@@ -1385,7 +1389,10 @@ struct LinalgToXeGPU : public tpp::impl::LinalgToXeGPUBase<LinalgToXeGPU> {
   using LinalgToXeGPUBase::LinalgToXeGPUBase;
 
   void runOnOperation() override {
-    LinalgToXeGPUOptions options{kTile, stages, dpasTile};
+    LinalgToXeGPUOptions options;
+    options.kTile = kTile;
+    options.stages = stages;
+    options.dpasTile = SmallVector<int64_t>{*dpasTile};
 
     // Run GEMM pattern first to allow fusion with its consumers.
     RewritePatternSet gemmPatterns(&getContext());
