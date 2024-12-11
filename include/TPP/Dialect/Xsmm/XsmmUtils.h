@@ -26,6 +26,10 @@ class MemRefType;
 namespace func {
 class CallOp;
 }
+namespace linalg {
+class GenericOp;
+struct ContractionDimensions;
+} // namespace linalg
 
 namespace xsmm {
 class UnaryKindAttr;
@@ -122,6 +126,19 @@ func::CallOp buildXsmmCall(RewriterBase &rewriter, XsmmCallType callType,
                            SmallVector<XsmmOperand> operands, TypeRange results,
                            FlatSymbolRefAttr fnName, Operation *parentOp,
                            Operation *insertBefore);
+
+std::optional<unsigned>
+getPosInCodomain(unsigned dim, linalg::GenericOp linalgOp, AffineMap map);
+
+LogicalResult checkVNNIGemmStructure(PatternRewriter &rewriter,
+                                     linalg::GenericOp linalgOp);
+
+FailureOr<linalg::ContractionDimensions>
+inferContractionDims(linalg::GenericOp genericOp);
+
+std::optional<unsigned> getAffineBinaryOpExprIndex(AffineMap map, int index,
+                                                   MLIRContext *context);
+
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

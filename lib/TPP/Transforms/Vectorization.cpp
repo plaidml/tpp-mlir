@@ -18,7 +18,6 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 namespace mlir {
 namespace tpp {
 #define GEN_PASS_DEF_VECTORIZATIONPASS
@@ -39,11 +38,8 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasPureBufferSemantics())
       return failure();
-    if (xsmm::utils::getDataType(rewriter, linalgOp.getOperand(0).getType()) ==
-            xsmm::DataTypeAttr::get(rewriter.getContext(),
-                                    xsmm::DataType::BF16) &&
-        linalgOp.getIteratorTypes().size() >= 4 &&
-        linalgOp.getNumOperands() == 3) {
+    auto check = xsmm::utils::checkVNNIGemmStructure(rewriter, linalgOp);
+    if (succeeded(check)) {
       SmallVector<int64_t> shape;
       SmallVector<ReassociationIndices> indices;
       int index = 0;
@@ -74,7 +70,12 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       auto map1 = linalgOp.getIndexingMapsArray()[1];
       map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1),
                                map0.getNumResults());
-      int map1Index = map1.getNumResults() - 3;
+      auto contractionDims = xsmm::utils::inferContractionDims(linalgOp);
+
+      auto k = contractionDims->k.size() > 0 ? contractionDims->k.back() : 0;
+      auto map1Index = *xsmm::utils::getAffineBinaryOpExprIndex(
+          map1, k, linalgOp.getContext());
+
       AffineExpr expr = map1.getResult(map1Index);
       if (isa<AffineBinaryOpExpr>(expr)) {
 
