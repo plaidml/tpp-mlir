@@ -677,21 +677,25 @@ LogicalResult checkVNNIGemmStructure(PatternRewriter &rewriter,
   unsigned m = contractionDims->m.back();
   unsigned n = contractionDims->n.back();
 
+  // m and n dimensions must be parallel dimensions
   if (!linalg::isParallelIterator(iteratorTypes[m]) ||
       !linalg::isParallelIterator(iteratorTypes[n])) {
     return failure();
   }
 
+  // innermost dimension must be a reduction dimension for VNNI type operations
   if (!linalg::isReductionIterator(iteratorTypes[iteratorTypes.size() - 1])) {
     return failure();
   }
 
+  // get the index of the iterator corresponding to the floordiv operation
   auto k = contractionDims->k.size() > 0 ? contractionDims->k.back() : 0;
   auto map1 = linalgOp.getIndexingMapsArray()[1];
   auto index = getAffineBinaryOpExprIndex(map1, k, linalgOp.getContext());
   if (!index)
     return failure();
 
+  // Ensure that the body of the generic operation is mul-add chain
   // clang-format off
   using namespace mlir::structured_match;
   auto hasRightOpChain =

@@ -68,11 +68,13 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
       }
       auto map0 = linalgOp.getIndexingMapsArray()[0];
       auto map1 = linalgOp.getIndexingMapsArray()[1];
+      // Set the innermost dimension of the first map to vnni dimension
       map0 = map0.insertResult(map1.getResult(map1.getNumResults() - 1),
                                map0.getNumResults());
       auto contractionDims = xsmm::utils::inferContractionDims(linalgOp);
 
       auto k = contractionDims->k.size() > 0 ? contractionDims->k.back() : 0;
+      // Get the index of the iterator corresponding to the floordiv operation
       auto map1Index = *xsmm::utils::getAffineBinaryOpExprIndex(
           map1, k, linalgOp.getContext());
 
@@ -82,6 +84,8 @@ struct LinalgGenericToVector : OpRewritePattern<linalg::GenericOp> {
         auto expand = rewriter.create<memref::ExpandShapeOp>(
             linalgOp.getLoc(), shape, linalgOp.getOperand(0), indices);
         linalgOp.setOperand(0, expand.getResult());
+        // Replace the floordiv operation with just the LHS of the floordiv
+        // expression
         map1 = map1.insertResult(
             dyn_cast<AffineBinaryOpExpr>(map1.getResult(map1Index)).getLHS(),
             map1Index + 1);
