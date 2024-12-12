@@ -8,6 +8,7 @@
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -38,7 +39,38 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
 }
 
 FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
-                                        AffineMap map, int64_t blockingFactor) {
+                                        std::optional<int64_t> blockingFactor) {
+  // Narrow down type operations - VNNI only applies to contractions.
+  if (failed(linalg::detail::verifyContractionInterface(linalgOp)))
+    return failure();
+
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return failure();
+
+  // At least two reduction dimensions are expected:
+  // one for the VNNI factor and one for the K dimension
+  if (dims->k.size() < 2)
+    return failure();
+
+  auto matA = linalgOp.getOperand(0);
+  auto matB = linalgOp.getOperand(1);
+  auto matC = linalgOp.getOperand(2);
+
+  auto typeA = dyn_cast<ShapedType>(matA.getType());
+  auto typeB = dyn_cast<ShapedType>(matB.getType());
+
+  // VNNI factor must be:
+  //   - the innermost inputs' dimension
+  //   - statically known
+  //   - multiple of 2 or equal to the specified factor
+  auto vnniDimSize = typeB.getShape().back();
+  if (!(vnniDimSize != ShapedType::kDynamic &&
+        typeA.getShape().back() == vnniDimSize &&
+        (blockingFactor ? vnniDimSize == *blockingFactor : vnniDimSize % 2)))
+    return failure();
+
   ArrayRef<AffineExpr> results = map.getResults();
   SmallVector<mlir::utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
