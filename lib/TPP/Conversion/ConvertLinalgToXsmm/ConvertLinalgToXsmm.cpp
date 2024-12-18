@@ -502,7 +502,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
     return failure();
   }
   if (contractionDims->m.size() != 1 || contractionDims->n.size() != 1 ||
-      (contractionDims->k.size() != 2 && contractionDims->k.size() != 1) ||
+      (contractionDims->k.size() != 3 && contractionDims->k.size() != 2) ||
       contractionDims->batch.size() != 0) {
     LLVM_DEBUG(llvm::dbgs() << "[checkStructure] Wrong dimensions\n");
     return failure();
