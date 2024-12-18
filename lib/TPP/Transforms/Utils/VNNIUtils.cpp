@@ -40,8 +40,6 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
 
 bool isInVnniLayout(linalg::GenericOp linalgOp,
                     std::optional<int64_t> blockingFactor) {
-  MLIRContext *ctx = linalgOp.getContext();
-
   // Narrow down type operations - VNNI only applies to contractions.
   if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
@@ -67,23 +65,28 @@ bool isInVnniLayout(linalg::GenericOp linalgOp,
   // The input matrix dimensions layout must match the following:
   //   - matrix A - [...][K/vnniFactor][vnniFactor]
   //   - matrix B - [...][K/vnniFactor][N][vnniFactor]
-  unsigned vnniDimPos = dims->k.back();
-  unsigned redDimPos = dims->k.end()[-2];
+  SmallVector<mlir::utils::IteratorType> iteratorTypes =
+      linalgOp.getIteratorTypesArray();
   AffineMap mapA = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(0));
   AffineMap mapB = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(1));
   unsigned rankA = typeA.getRank();
   unsigned rankB = typeB.getRank();
 
-  // Map contraction dims (iterators) to operand dims (shape dim)
-  // to validate layout.
-  if (mapA.getResultPosition(getAffineDimExpr(vnniDimPos, ctx)) !=
-          (rankA - 1) ||
-      mapA.getResultPosition(getAffineDimExpr(redDimPos, ctx)) != (rankA - 2) ||
-      mapB.getResultPosition(getAffineDimExpr(vnniDimPos, ctx)) !=
-          (rankB - 1) ||
-      mapB.getResultPosition(getAffineDimExpr(dims->n.back(), ctx)) !=
-          (rankB - 2) ||
-      mapB.getResultPosition(getAffineDimExpr(redDimPos, ctx)) != (rankB - 3))
+  auto vnniDimA = dyn_cast<AffineDimExpr>(mapA.getResult(rankA - 1));
+  auto vnniDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 1));
+  if (!vnniDimA || !vnniDimB || vnniDimA != vnniDimB ||
+      iteratorTypes[vnniDimA.getPosition()] !=
+          mlir::utils::IteratorType::reduction)
+    return false;
+  auto redDimA = dyn_cast<AffineDimExpr>(mapA.getResult(rankA - 2));
+  auto redDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 3));
+  if (!redDimA || !redDimB || redDimA != redDimB ||
+      iteratorTypes[redDimA.getPosition()] !=
+          mlir::utils::IteratorType::reduction)
+    return false;
+  auto parallelDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 2));
+  if (!parallelDimB || iteratorTypes[parallelDimB.getPosition()] !=
+                           mlir::utils::IteratorType::parallel)
     return false;
 
   // VNNI factor must be:
