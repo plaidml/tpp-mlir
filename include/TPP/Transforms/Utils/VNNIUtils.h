@@ -48,9 +48,8 @@ bool isInVnniLayout(int64_t expectedRank, VectorType vector);
 
 // Return the first AffineDimExpr in the map `affineMap`
 // with a VNNI layout pattern (AffineDimExpr floordiv VNNI).
-FailureOr<AffineDimExpr>
-isInVnniLayout(linalg::GenericOp linalgOp,
-               std::optional<int64_t> blockingFactor = std::nullopt);
+bool isInVnniLayout(linalg::GenericOp linalgOp,
+                    std::optional<int64_t> blockingFactor = std::nullopt);
 
 } // namespace utils
 } // namespace vnni

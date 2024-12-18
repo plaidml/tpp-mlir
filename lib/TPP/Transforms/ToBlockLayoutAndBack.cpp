@@ -339,9 +339,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                        "unsupported blocking factor for type");
   }
 
-  AffineMap mapOperandB = matmulOp.getMatchingIndexingMap(&operandB);
-  if (succeeded(vnni::utils::isInVnniLayout(matmulOp, mapOperandB,
-                                            *blockingFactor))) {
+  if (vnni::utils::isInVnniLayout(matmulOp, *blockingFactor)) {
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
   }
 
@@ -674,6 +672,7 @@ struct PackVNNI : public tpp::impl::PackVNNIBase<PackVNNI> {
     RewritePatternSet patterns(ctx);
     linalg::populateLinalgDeGeneralizationPatterns(patterns);
     patterns.add<VNNIOnMatmul, VNNIOnBRGemm>(ctx);
+    tensor::populateSimplifyPackAndUnpackPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };

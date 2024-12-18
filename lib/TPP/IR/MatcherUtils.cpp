@@ -86,13 +86,9 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
     return std::make_pair(false, hasBatch);
 
   int64_t batchRedIter = std::numeric_limits<int64_t>::max();
-  int64_t kRedIter = std::numeric_limits<int64_t>::max();
   if (operandAPosIterRed.size() == 2) {
     batchRedIter = operandAPosIterRed[0];
-    kRedIter = operandAPosIterRed[1];
     hasBatch = true;
-  } else {
-    kRedIter = operandAPosIterRed[0];
   }
 
   // Operand B: One parallel iterator (j) and three reduction ones (batch,
@@ -112,10 +108,8 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
     return std::make_pair(false, hasBatch);
   }
 
-  auto vnniDim =
-      vnni::utils::isInVnniLayout(linalgOp, mapOperandB, *blockingFactor);
-  bool isBrgemmOp = succeeded(vnniDim) && vnniDim->getPosition() == kRedIter;
-  return std::make_pair(isBrgemmOp, hasBatch);
+  bool isBrgemmVnni = vnni::utils::isInVnniLayout(linalgOp, *blockingFactor);
+  return std::make_pair(isBrgemmVnni, hasBatch);
 }
 
 // Return true if all the operand have the same type, i.e., no implicit
