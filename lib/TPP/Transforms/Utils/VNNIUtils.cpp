@@ -43,7 +43,7 @@ bool isInVnniLayout(linalg::GenericOp linalgOp,
   MLIRContext *ctx = linalgOp.getContext();
 
   // Narrow down type operations - VNNI only applies to contractions.
-  if (failed(linalg::detail::verifyContractionInterface(linalgOp)))
+  if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
 
   FailureOr<linalg::ContractionDimensions> dims =
