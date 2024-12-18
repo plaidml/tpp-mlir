@@ -7,13 +7,14 @@ func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>,
   return %0: tensor<4x4xbf16>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: brgemm
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<32x4x4xbf16>, %[[ARG1:.+]]: tensor<32x4x4xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4xbf16>
+// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] [[0], [1], [2, 3]] output_shape [32, 4, 2, 2] : tensor<32x4x4xbf16> into tensor<32x4x2x2xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<32x2x4x2xbf16>
 // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]]
 // CHECK-SAME:  inner_dims_pos = [1] inner_tiles = [2] into %[[EMPTY]]
@@ -21,7 +22,7 @@ func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>,
 // CHECK: linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]
-// CHECK-SAME: ins(%[[ARG0]], %[[PACK]]
+// CHECK-SAME: ins(%[[VNNI_A]], %[[PACK]]
 // CHECK-SAME: outs(%[[ARG2]]
 
 // -----
@@ -60,34 +61,36 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
   return %1 : tensor<4x4x32x32xbf16>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5 floordiv 2, d4, d6)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5, d6)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5, d4, d6)>
 // CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>
 
 // CHECK-LABEL: prepacked_matmul
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<4x4x32x32xbf16>, %[[ARG1:.+]]: tensor<4x4x32x32xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4x32x32xbf16>
+// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] [[0], [1], [2], [3, 4]]
+// CHECK-SAME: output_shape [4, 4, 32, 16, 2] : tensor<4x4x32x32xbf16> into tensor<4x4x32x16x2xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x16x32x2xbf16>
 // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [2] inner_tiles = [2] into %[[EMPTY]]
 // CHECK-SAME:  : tensor<4x4x32x32xbf16> -> tensor<4x4x16x32x2xbf16>
 // CHECK: {{.+}} = linalg.generic
 // CHECK-SAME:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]
-// CHECK-SAME: ins(%[[ARG0]], %[[PACK]]
+// CHECK-SAME: ins(%[[VNNI_A]], %[[PACK]]
 // CHECK-SAME: outs(%[[ARG2]]
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6, d5, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
 
-func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x4x16x32x2xbf16>,
+func.func @already_packed_matmul(%arg0: tensor<4x4x32x16x2xbf16>, %arg1: tensor<4x4x16x32x2xbf16>,
                                  %arg2: tensor<4x4x32x32xbf16>) -> tensor<4x4x32x32xbf16> {
   %1 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : tensor<4x4x32x32xbf16>, tensor<4x4x16x32x2xbf16>)
+    ins(%arg0, %arg1 : tensor<4x4x32x16x2xbf16>, tensor<4x4x16x32x2xbf16>)
     outs(%arg2 : tensor<4x4x32x32xbf16>) {
     ^bb0(%in: bf16, %in_0: bf16, %out: bf16):
       %2 = arith.mulf %in, %in_0 : bf16
@@ -98,6 +101,33 @@ func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x
 }
 
 // CHECK-LABEL: already_packed_matmul
+// CHECK-NOT: expand_shape
+// CHECK-NOT: tensor.pack
+// CHECK: linalg.generic
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
+
+func.func @no_pack_invalid_reduction_map(%arg0: tensor<3x16x8xbf16>,
+  %arg1: tensor<3x4x16x2xbf16>, %arg2: tensor<16x16xbf16>) -> tensor<16x16xbf16> {
+  %0 = linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%arg0, %arg1 : tensor<3x16x8xbf16>, tensor<3x4x16x2xbf16>)
+    outs(%arg2 : tensor<16x16xbf16>) {
+      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+        %1 = arith.mulf %in, %in_2 : bf16
+        %2 = arith.addf %out, %1 : bf16
+        linalg.yield %2 : bf16
+    } -> tensor<16x16xbf16>
+  return %0 : tensor<16x16xbf16>
+}
+
+// CHECK: no_pack_invalid_reduction_map
+// CHECK-NOT: expand_shape
 // CHECK-NOT: tensor.pack
 // CHECK: linalg.generic
 
@@ -107,7 +137,7 @@ func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d1, d2 floordiv 2, d6 floordiv 2, d5, d3, d7)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d4, d5)>
 
-func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x2x16x32x2x2xbf16>,
+func.func @no_pack_not_contraction(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x2x16x32x2x2xbf16>,
                                  %arg2: tensor<4x4x32x32xbf16>) -> tensor<4x4x32x32xbf16> {
   %1 = linalg.generic {
     indexing_maps = [#map, #map1, #map2],
@@ -122,6 +152,7 @@ func.func @already_packed_matmul(%arg0: tensor<4x4x32x32xbf16>, %arg1: tensor<4x
   return %1 : tensor<4x4x32x32xbf16>
 }
 
-// CHECK: already_packed_matmul
+// CHECK: no_pack_not_contraction
+// CHECK-NOT: expand_shape
 // CHECK-NOT: tensor.pack
 // CHECK: linalg.generic
