@@ -38,7 +38,7 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
   return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
 }
 
-bool isInVnniLayout(linalg::GenericOp linalgOp,
+bool isInVnniLayout(linalg::LinalgOp linalgOp,
                     std::optional<int64_t> blockingFactor) {
   // Narrow down type operations - VNNI only applies to contractions.
   if (!linalg::isaContractionOpInterface(linalgOp))
@@ -54,8 +54,8 @@ bool isInVnniLayout(linalg::GenericOp linalgOp,
   if (dims->k.size() < 2)
     return false;
 
-  auto matA = linalgOp.getOperand(0);
-  auto matB = linalgOp.getOperand(1);
+  auto matA = linalgOp->getOperand(0);
+  auto matB = linalgOp->getOperand(1);
 
   auto typeA = dyn_cast<ShapedType>(matA.getType());
   auto typeB = dyn_cast<ShapedType>(matB.getType());
@@ -96,7 +96,8 @@ bool isInVnniLayout(linalg::GenericOp linalgOp,
   auto vnniDimSize = typeB.getShape().back();
   if (!(vnniDimSize != ShapedType::kDynamic &&
         typeA.getShape().back() == vnniDimSize &&
-        (blockingFactor ? vnniDimSize == *blockingFactor : vnniDimSize % 2)))
+        (blockingFactor ? vnniDimSize == *blockingFactor
+                        : vnniDimSize % 2 == 0)))
     return false;
 
   // The split reduction dimension size should also match.

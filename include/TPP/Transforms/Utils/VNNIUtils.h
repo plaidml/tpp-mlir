@@ -22,7 +22,7 @@ class AffineMap;
 class VectorType;
 
 namespace linalg {
-class GenericOp;
+class LinalgOp;
 } // namespace linalg
 
 namespace vnni {
@@ -48,7 +48,7 @@ bool isInVnniLayout(int64_t expectedRank, VectorType vector);
 
 // Return the first AffineDimExpr in the map `affineMap`
 // with a VNNI layout pattern (AffineDimExpr floordiv VNNI).
-bool isInVnniLayout(linalg::GenericOp linalgOp,
+bool isInVnniLayout(linalg::LinalgOp linalgOp,
                     std::optional<int64_t> blockingFactor = std::nullopt);
 
 } // namespace utils
