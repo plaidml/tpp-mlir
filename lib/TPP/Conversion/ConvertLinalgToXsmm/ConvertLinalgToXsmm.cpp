@@ -786,7 +786,9 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
     return linalgOp;
   }
 
-  if (!isInnerMostDim(operandA, *minorKInCodomainOpA)) {
+  bool isVnni = vnni::utils::isInVnniLayout(linalgOp);
+
+  if (!isVnni && !isInnerMostDim(operandA, *minorKInCodomainOpA)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
     assert(isInnerMostDim(operandA, *minorMInCodomainOpA));
@@ -795,8 +797,7 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   }
   // Do not inject transposes in case of VNNI format.
   // Otherwise, it breaks later VNNI layout validation.
-  if (!isInnerMostDim(operandB, *minorNInCodomainOpB) &&
-      !vnni::utils::isInVnniLayout(linalgOp)) {
+  if (!isVnni && !isInnerMostDim(operandB, *minorNInCodomainOpB)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
     assert(isInnerMostDim(operandB, *minorKInCodomainOpB));

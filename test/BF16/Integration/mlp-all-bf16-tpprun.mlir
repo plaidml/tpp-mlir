@@ -12,7 +12,7 @@ memref.global "private" constant @arg7 : memref<1024x1000x2xbf16> = dense<1.00e+
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d1)>
 
-func.func @entry(%arg0: <128x256xbf16>, %arg2: memref<512xbf16>, %arg4: memref<1024xbf16>,
+func.func @entry(%arg0: memref<128x256xbf16>, %arg2: memref<512xbf16>, %arg4: memref<1024xbf16>,
     %arg6: memref<2048xbf16>, %arg8: memref<1000xbf16>, %arg9: memref<128x512xbf16>,
     %arg10: memref<128x1024xbf16>, %arg11: memref<128x2048xbf16>, %arg12: memref<128x1000xbf16>) {
   %c0 = arith.constant 0.0 : bf16
@@ -80,7 +80,7 @@ func.func @entry(%arg0: <128x256xbf16>, %arg2: memref<512xbf16>, %arg4: memref<1
   }
 
   %relayout_arg11 = memref.get_global @arg5:memref<512x2048x2xbf16>
-  %e2 = memref.expand_shape %arg10 [[0], [1, 2]] output_shape [128, 256, 2]
+  %e2 = memref.expand_shape %arg10 [[0], [1, 2]] output_shape [128, 512, 2]
     : memref<128x1024xbf16> into memref<128x512x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
@@ -108,7 +108,7 @@ func.func @entry(%arg0: <128x256xbf16>, %arg2: memref<512xbf16>, %arg4: memref<1
   }
 
   %relayout_arg10 = memref.get_global @arg7:memref<1024x1000x2xbf16>
-  %e3 = memref.expand_shape %arg11 [[0], [1, 2]] output_shape [128, 256, 2]
+  %e3 = memref.expand_shape %arg11 [[0], [1, 2]] output_shape [128, 1024, 2]
     : memref<128x2048xbf16> into memref<128x1024x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
