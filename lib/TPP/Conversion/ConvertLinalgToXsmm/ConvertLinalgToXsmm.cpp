@@ -453,6 +453,20 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   }
   auto flags = rewriter.getArrayAttr(gemmFlags);
   SmallVector<Value> invokeOperands;
+  SmallVector<Value> inputs = {linalgOp->getOperands()};
+
+  // Collapse VNNI factor dimension for matrix A.
+  if (brgemmInfo.isVnni) {
+    auto rankA = cast<ShapedType>(inputs[0].getType()).getRank();
+    assert(rankA >= 3 && "Invalid A mat rank for VNNI");
+    SmallVector<ReassociationIndices> reassoc;
+    for (int64_t index = 0; index < rankA - 2; index++)
+      reassoc.push_back({index});
+    reassoc.push_back(ReassociationIndices{rankA - 2, rankA - 1});
+
+    inputs[0] =
+        rewriter.create<memref::CollapseShapeOp>(loc, inputs[0], reassoc);
+  }
 
   if (batch != 0) {
     DenseI64ArrayAttr dims = DenseI64ArrayAttr::get(
@@ -463,8 +477,7 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
     Value batchDim = rewriter.create<arith::ConstantOp>(
         loc, integer64, rewriter.getIntegerAttr(integer64, batch));
     invokeOperands.push_back(dispatched);
-    invokeOperands.append(linalgOp->getOperands().begin(),
-                          linalgOp->getOperands().end());
+    invokeOperands.append(inputs);
     invokeOperands.push_back(batchDim);
     rewriter.replaceOpWithNewOp<xsmm::BrgemmOp>(linalgOp, dtype,
                                                 invokeOperands);
@@ -474,8 +487,7 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
     Value dispatched = rewriter.create<xsmm::GemmDispatchOp>(
         loc, integer64, dims, flags, dtype);
     invokeOperands.push_back(dispatched);
-    invokeOperands.append(linalgOp->getOperands().begin(),
-                          linalgOp->getOperands().end());
+    invokeOperands.append(inputs);
     rewriter.replaceOpWithNewOp<xsmm::GemmOp>(linalgOp, dtype, invokeOperands);
   }
 }
@@ -575,8 +587,10 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
   auto loops = linalgOp.computeStaticLoopSizes();
   int64_t batchVal = (batchPos) ? loops[batchPos.value()] : 0;
 
+  bool isVnni = vnni::utils::isInVnniLayout(linalgOp);
+
   BrgemmInfo info{loops[m], loops[n], loops[k], batchVal, *lda,
-                  *ldb,     *ldc,     strideA,  strideB};
+                  *ldb,     *ldc,     strideA,  strideB,  isVnni};
   return info;
 }
 
@@ -601,7 +615,7 @@ static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
   unsigned n = contractionDims->n[0];
   unsigned k = contractionDims->k.back();
   std::optional<unsigned> batch;
-  if (contractionDims->k.size() == 2)
+  if (contractionDims->k.size() == 3)
     batch = contractionDims->k.front();
 
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Candidate dims: "
@@ -779,7 +793,10 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
     emitTransposeOnOperand(rewriter, linalgOp, operandA, *minorKInCodomainOpA,
                            *minorMInCodomainOpA);
   }
-  if (!isInnerMostDim(operandB, *minorNInCodomainOpB)) {
+  // Do not inject transposes in case of VNNI format.
+  // Otherwise, it breaks later VNNI layout validation.
+  if (!isInnerMostDim(operandB, *minorNInCodomainOpB) &&
+      !vnni::utils::isInVnniLayout(linalgOp)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
     assert(isInnerMostDim(operandB, *minorKInCodomainOpB));
@@ -804,7 +821,7 @@ void ConvertLinalgToXsmm::runOnOperation() {
     unsigned n = contractionDims->n[0];
     unsigned k = contractionDims->k.back();
     std::optional<unsigned> batch;
-    if (contractionDims->k.size() == 2)
+    if (contractionDims->k.size() == 3)
       contractionDims->k.front();
 
     if (failed(checkAccess(genericOp, m, n, k, batch))) {
