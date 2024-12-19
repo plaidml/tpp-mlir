@@ -82,11 +82,11 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
 
   llvm::SmallVector<int64_t> operandAPosIterRed = getIteratorPos(
       linalgOp, mapOperandA, mlir::utils::IteratorType::reduction);
-  if (operandAPosIterRed.size() != 2 && operandAPosIterRed.size() != 1)
+  if (operandAPosIterRed.size() != 3 && operandAPosIterRed.size() != 2)
     return std::make_pair(false, hasBatch);
 
   int64_t batchRedIter = std::numeric_limits<int64_t>::max();
-  if (operandAPosIterRed.size() == 2) {
+  if (operandAPosIterRed.size() == 3) {
     batchRedIter = operandAPosIterRed[0];
     hasBatch = true;
   }
