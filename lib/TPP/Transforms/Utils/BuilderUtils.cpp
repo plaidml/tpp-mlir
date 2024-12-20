@@ -36,18 +36,22 @@ arith::ConstantOp getConstant(OpBuilder &builder, Type type, ValueT value) {
 
 func::FuncOp createFunction(OpBuilder &builder, ModuleOp module, StringRef name,
                             TypeRange args, TypeRange ret, bool createBody) {
-  auto unkLoc = builder.getUnknownLoc();
-  auto funcType = FunctionType::get(builder.getContext(), args, ret);
-  auto func = func::FuncOp::create(unkLoc, name, funcType);
-  func.setVisibility(SymbolTable::Visibility::Private);
-  if (createBody) {
-    func.setVisibility(SymbolTable::Visibility::Public);
-    auto *entryBlock = func.addEntryBlock();
-    builder.setInsertionPointToEnd(entryBlock);
+  auto oper = module.lookupSymbol(name);
+  if (oper)
+    return dyn_cast<func::FuncOp>(oper);
+  else {
+    auto unkLoc = builder.getUnknownLoc();
+    auto funcType = FunctionType::get(builder.getContext(), args, ret);
+    auto func = func::FuncOp::create(unkLoc, name, funcType);
+    func.setVisibility(SymbolTable::Visibility::Private);
+    if (createBody) {
+      func.setVisibility(SymbolTable::Visibility::Public);
+      auto *entryBlock = func.addEntryBlock();
+      builder.setInsertionPointToEnd(entryBlock);
+    }
+    module.push_back(func);
+    return func;
   }
-  module.push_back(func);
-
-  return func;
 }
 
 Value getConstInt(OpBuilder &builder, int value, int width) {

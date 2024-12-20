@@ -94,6 +94,7 @@ private:
     }
     if (vectorToXSMM) {
       skipOperations.clear();
+      skipOperations.push_back("unary");
       skipOperations.push_back("transpose");
       skipOperations.push_back("vnni");
     }
@@ -143,11 +144,11 @@ private:
         pm.addNestedPass<func::FuncOp>(createLoopInvariantCodeMotionPass());
         pm.addNestedPass<func::FuncOp>(createVectorizationPass());
 
-	//Please note, canonicalizer should be after hoisting pass because 
-	//it fuses outer tiling loops and it results in no pattern 
-	//matching for hoisting pass. Moved inside VectorToKernel Path.
-        
-	if (vectorToXSMM) {
+        // Please note, canonicalizer should be after hoisting pass because
+        // it fuses outer tiling loops and it results in no pattern
+        // matching for hoisting pass. Moved inside VectorToKernel Path.
+
+        if (vectorToXSMM) {
           pm.addPass(createVectorToXSMM());
         }
         if (vectorToKernel) {
@@ -193,4 +194,3 @@ private:
 };
 
 } // namespace
-

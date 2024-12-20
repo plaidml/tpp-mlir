@@ -29,16 +29,15 @@ using namespace mlir::xsmm;
 #define DEBUG_TYPE "convert-vector-to-xsmm"
 
 static pair<Operation *, Operation *>
-getTransposeXSMMCalls(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
-                      Type outputType, xsmm::UnaryKind unaryKind,
-                      Operation *input, Operation *output,
-                      Operation *transposeOp) {
+getUnaryXSMMCalls(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
+                  Type outputType, xsmm::UnaryKind unaryKind, Operation *input,
+                  Operation *output, Operation *unaryOp, int64_t unaryFlag) {
   std::string dispatchName = "xsmm_unary_dispatch";
   std::string invokeName = "xsmm_unary_invoke";
-  Location loc = transposeOp->getLoc();
+  Location loc = unaryOp->getLoc();
 
   auto dtype =
-      xsmm::utils::getDataType(rewriter, transposeOp->getOperand(0).getType());
+      xsmm::utils::getDataType(rewriter, unaryOp->getOperand(0).getType());
 
   SmallVector<xsmm::utils::XsmmOperand> dispatchOperands;
   xsmm::UnaryKindAttr kind =
@@ -49,14 +48,12 @@ getTransposeXSMMCalls(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
 
   dispatchOperands.append(SmallVector<xsmm::utils::XsmmOperand>{
       unaryInfo.m, unaryInfo.n, unaryInfo.ldi, unaryInfo.ldo});
-  IntegerAttr unaryFlags = dyn_cast<IntegerAttr>(
-      xsmm::UnaryFlagsAttr::get(rewriter.getContext(), xsmm::UnaryFlags::NONE));
-  dispatchOperands.push_back(unaryFlags.getInt());
+  dispatchOperands.push_back(unaryFlag);
 
   auto dispatchCall = xsmm::utils::buildXsmmCall(
       rewriter, xsmm::utils::XsmmCallType::DISPATCH, loc, dtype,
       dispatchOperands, IntegerType::get(rewriter.getContext(), 64),
-      SymbolRefAttr::get(transposeOp->getContext(), dispatchName), transposeOp,
+      SymbolRefAttr::get(unaryOp->getContext(), dispatchName), unaryOp,
       nullptr);
   SmallVector<xsmm::utils::XsmmOperand> operandRange{
       dyn_cast<DataTypeAttr>(dtype).getInt(),
@@ -65,8 +62,8 @@ getTransposeXSMMCalls(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
       input->getOperand(0), output->getOperand(1)};
   auto invokeCall = xsmm::utils::buildXsmmCall(
       rewriter, xsmm::utils::XsmmCallType::INVOKE, loc, dtype, operandRange,
-      TypeRange(), SymbolRefAttr::get(transposeOp->getContext(), invokeName),
-      transposeOp, output);
+      TypeRange(), SymbolRefAttr::get(unaryOp->getContext(), invokeName),
+      unaryOp, output);
   return std::make_pair(&*dispatchCall, &*invokeCall);
 }
 
@@ -107,8 +104,11 @@ convertTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
   } else {
     std::swap(unaryInfo.m, unaryInfo.n);
   }
-  return getTransposeXSMMCalls(rewriter, unaryInfo, outputType, opType, input,
-                               output, transposeOp);
+
+  IntegerAttr unaryFlags = dyn_cast<IntegerAttr>(
+      xsmm::UnaryFlagsAttr::get(rewriter.getContext(), xsmm::UnaryFlags::NONE));
+  return getUnaryXSMMCalls(rewriter, unaryInfo, outputType, opType, input,
+                           output, transposeOp, unaryFlags.getInt());
 }
 
 static LogicalResult validateTransposeOp(PatternRewriter &rewriter,
@@ -163,11 +163,57 @@ static LogicalResult validateTransposeOp(PatternRewriter &rewriter,
   return success();
 }
 
+static std::pair<Operation *, Operation *>
+convertBroadcast(PatternRewriter &rewriter, Operation *broadcastOp,
+                 Operation *input, Operation *output) {
+  LLVM_DEBUG(llvm::dbgs() << "convertBroadcast\n");
+  auto unaryFlag = xsmm::utils::getUnaryFlags(input->getOperand(0).getType(),
+                                              output->getOperand(1).getType());
+  auto inputMemRefType = dyn_cast<MemRefType>(input->getOperand(0).getType());
+  auto outputMemRefType = dyn_cast<MemRefType>(output->getOperand(1).getType());
+  auto inputVectorType = dyn_cast<VectorType>(input->getResult(0).getType());
+  auto outputVectorType = dyn_cast<VectorType>(output->getOperand(0).getType());
+  auto unaryInfo = *xsmm::utils::getVectorUnaryInfo(
+      outputMemRefType, outputMemRefType, inputMemRefType, inputVectorType,
+      outputVectorType, *unaryFlag);
+  if (*unaryFlag == UnaryFlags::BCAST_ROW)
+    std::swap(unaryInfo.ldi, unaryInfo.ldo);
+
+  IntegerAttr unaryFlags = dyn_cast<IntegerAttr>(
+      xsmm::UnaryFlagsAttr::get(rewriter.getContext(), *unaryFlag));
+
+  return getUnaryXSMMCalls(rewriter, unaryInfo, outputVectorType,
+                           xsmm::UnaryKind::IDENTITY, input, output,
+                           broadcastOp, unaryFlags.getInt());
+}
+
+static LogicalResult validateBroadcastOp(PatternRewriter &rewriter,
+                                         Operation *broadcastOp,
+                                         Operation *input, Operation *output) {
+  LLVM_DEBUG(llvm::dbgs() << "validateBroadcastOp\n");
+  auto unaryFlag = xsmm::utils::getUnaryFlags(input->getOperand(0).getType(),
+                                              output->getOperand(1).getType());
+  auto inputMemRefType = dyn_cast<MemRefType>(input->getOperand(0).getType());
+  auto outputMemRefType = dyn_cast<MemRefType>(output->getOperand(1).getType());
+  auto inputVectorType = dyn_cast<VectorType>(input->getResult(0).getType());
+  auto outputVectorType = dyn_cast<VectorType>(output->getOperand(0).getType());
+  auto unaryInfo = xsmm::utils::getVectorUnaryInfo(
+      outputMemRefType, inputMemRefType, outputMemRefType, inputVectorType,
+      outputVectorType, *unaryFlag);
+  if (failed(unaryInfo))
+    return failure();
+  return success();
+}
+
 static void registerNativeRewrite(RewritePatternSet &patterns) {
   patterns.getPDLPatterns().registerRewriteFunction("ConvertTranspose",
                                                     convertTransposeOp);
   patterns.getPDLPatterns().registerConstraintFunction("ValidateTranspose",
                                                        validateTransposeOp);
+  patterns.getPDLPatterns().registerRewriteFunction("ConvertBroadcast",
+                                                    convertBroadcast);
+  patterns.getPDLPatterns().registerConstraintFunction("ValidateBroadcast",
+                                                       validateBroadcastOp);
 }
 
 namespace mlir {
