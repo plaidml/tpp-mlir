@@ -9,6 +9,7 @@
 #ifndef TPP_TRANSFORMS_UTILS_VNNIUTILS_H
 #define TPP_TRANSFORMS_UTILS_VNNIUTILS_H
 
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Support/LogicalResult.h"
 #include <cstdint>
 #include <optional>
@@ -51,7 +52,8 @@ bool isInVnniLayout(int64_t expectedRank, VectorType vector);
 FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
                                         AffineMap affineMap,
                                         int64_t blockingFactor);
-
+FailureOr<AffineDimExpr> isInVnniLayout(mlir::vector::ContractionOp contractOp,
+                                        int64_t blockingFactor);
 } // namespace utils
 } // namespace vnni
 } // namespace mlir

@@ -12,6 +12,7 @@
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -23,9 +24,134 @@
 #include "llvm/Support/Debug.h"
 #define DEBUG_TYPE "xsmm-utils"
 
+using namespace mlir::linalg;
+
 namespace mlir {
 namespace xsmm {
 namespace utils {
+
+// Callable object to verify if `operand` has static shape.
+struct HasStaticShape {
+  SmallVectorImpl<int64_t> *shape = nullptr;
+  HasStaticShape() = default;
+  HasStaticShape(SmallVectorImpl<int64_t> *shape) : shape(shape){};
+
+  bool operator()(Value operand, Operation *op) const {
+    auto operandType = operand.getType();
+    if (auto shapedType = dyn_cast_or_null<ShapedType>(operandType)) {
+      if (!shapedType.hasStaticShape())
+        return false;
+      if (shape) {
+        for (int64_t shapeOnDim : shapedType.getShape())
+          shape->push_back(shapeOnDim);
+      }
+    }
+    return true;
+  }
+};
+
+// Callable object to verify if `operand` has static strides.
+// If `operand` is a tensor type or a scalar, return true.
+struct HasStaticStrides {
+  SmallVectorImpl<int64_t> *strides = nullptr;
+  HasStaticStrides() = default;
+  HasStaticStrides(SmallVector<int64_t> *strides) : strides(strides){};
+
+  bool operator()(Value operand, Operation *op) const {
+    auto operandType = operand.getType();
+    SmallVector<int64_t> strides;
+    if (auto memRefType = dyn_cast_or_null<MemRefType>(operandType)) {
+      int64_t offset;
+      if (failed(getStridesAndOffset(memRefType, strides, offset)))
+        return false;
+      if (llvm::any_of(strides, [](int64_t stride) {
+            return stride == ShapedType::kDynamic;
+          })) {
+        return false;
+      }
+      if (this->strides)
+        this->strides->append(strides.begin(), strides.end());
+    }
+    return true;
+  }
+};
+
+// Structural matcher.
+static FailureOr<ContractionDimensions>
+checkStructure(vector::ContractionOp contractOp, SmallVector<Value> &inputs,
+               SmallVector<Value> &outputs, ArrayRef<AffineMap> indexingMap) {
+  if (!HasStaticShape()(inputs[0], inputs[0].getDefiningOp()) ||
+      !HasStaticShape()(inputs[1], inputs[1].getDefiningOp()) ||
+      !HasStaticShape()(inputs[2], inputs[2].getDefiningOp()) ||
+      (outputs[0] != nullptr &&
+       !HasStaticShape()(outputs[0], outputs[0].getDefiningOp())) ||
+      !HasStaticStrides()(inputs[0], inputs[0].getDefiningOp()) ||
+      !HasStaticStrides()(inputs[1], inputs[1].getDefiningOp()) ||
+      !HasStaticStrides()(inputs[2], inputs[2].getDefiningOp()) ||
+      (outputs[0] != nullptr &&
+       !HasStaticStrides()(outputs[0], outputs[0].getDefiningOp()))) {
+    return failure();
+  }
+
+  return inferContractionDims(indexingMap);
+}
+
+// Return the position of `dim` in the codomain of `operand`.
+std::optional<unsigned> getPosInCodomain(unsigned dim,
+                                         vector::ContractionOp contractOp,
+                                         AffineMap map) {
+  return map.getResultPosition(getAffineDimExpr(dim, contractOp.getContext()));
+}
+
+static SmallVector<int64_t, 4>
+createFlatListOfOperandStaticDims(vector::ContractionOp contractOp) {
+  SmallVector<int64_t, 4> res;
+  for (unsigned op = 0; op < contractOp.getOperation()->getNumOperands();
+       op++) {
+    Value operand = contractOp.getOperation()->getOperand(op);
+    llvm::append_range(res, dyn_cast<ShapedType>(operand.getType()).getShape());
+  }
+  return res;
+}
+
+static SmallVector<int64_t, 4>
+computeStaticLoopSizes(vector::ContractionOp contractOp,
+                       ArrayRef<AffineMap> maps) {
+  AffineMap map = concatAffineMaps(maps, contractOp.getContext());
+  unsigned numDims = map.getNumDims(), numRes = map.getNumResults();
+  SmallVector<int64_t, 4> res(numDims, 0);
+  auto allShapeSizes = createFlatListOfOperandStaticDims(contractOp);
+  for (unsigned idx = 0; idx < numRes; ++idx) {
+    auto result = map.getResult(idx);
+    if (auto d = dyn_cast<AffineDimExpr>(result)) {
+      res[d.getPosition()] = allShapeSizes[idx];
+    }
+  }
+  return res;
+}
+
+static FailureOr<SmallVector<int64_t>>
+getVNNIStaticStrides(MemRefType valueType) {
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  SmallVector<int64_t> shape;
+  for (size_t i = 0; i < valueType.getShape().size(); i++) {
+    shape.push_back(valueType.getShape()[i]);
+  }
+  auto temp = shape[shape.size() - 1];
+  shape[shape.size() - 1] = shape[shape.size() - 2];
+  shape[shape.size() - 2] = temp;
+  auto memrefType = MemRefType::get(shape, valueType.getElementType());
+  if (failed(getStridesAndOffset(memrefType, strides, offset))) {
+    return failure();
+  }
+  if (llvm::any_of(strides, [](int64_t stride) {
+        return stride == ShapedType::kDynamic;
+      })) {
+    return failure();
+  }
+  return strides;
+}
 
 // Examples:
 // If lower=[c], higher=[a, b, c], [c] reshaped into [1, 1, c].
@@ -287,22 +413,9 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType) {
   return failure();
 }
 
-FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
-                                      OperandPos operandNumber) {
-  assert(isa<ShapedType>(outputType) && "expect shaped type on output");
-  assert(cast<ShapedType>(outputType).getRank() == 2 &&
-         "expect rank 2 on output");
-
-  if (!isa<ShapedType>(operandType) ||
-      cast<ShapedType>(operandType).getRank() == 0) {
-    if (operandNumber == OperandPos::LHS)
-      return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
-    return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
-  }
-
-  enum class BCastType { NONE = 0, SCALAR, ROW, COL };
-  auto shapeOutput = cast<MemRefType>(outputType).getShape();
-  auto shapeOperand = cast<MemRefType>(operandType).getShape();
+FailureOr<BinaryFlags> getBinFlags(ArrayRef<int64_t> shapeOutput,
+                                   ArrayRef<int64_t> shapeOperand,
+                                   OperandPos operandNumber) {
   assert(shapeOutput.size() >= shapeOperand.size() &&
          "Output rank must be >= operand rank");
   SmallVector<int64_t> bOperandShape;
@@ -310,6 +423,7 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
   assert(shapeOutput.size() == bOperandShape.size());
   assert(shapeOutput.size() == 2);
 
+  enum class BCastType { NONE = 0, SCALAR, ROW, COL };
   auto getBCastEnum = [](BCastType bCastType,
                          OperandPos operandPos) -> xsmm::BinaryFlags {
     switch (bCastType) {
@@ -350,9 +464,70 @@ FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
 
   return failure();
 }
+FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
+                                      OperandPos operandNumber) {
+  assert(isa<ShapedType>(outputType) && "expect shaped type on output");
+  assert(cast<ShapedType>(outputType).getRank() == 2 &&
+         "expect rank 2 on output");
+
+  if (!isa<ShapedType>(operandType) ||
+      cast<ShapedType>(operandType).getRank() == 0) {
+    if (operandNumber == OperandPos::LHS)
+      return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
+    return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
+  }
+
+  enum class BCastType { NONE = 0, SCALAR, ROW, COL };
+  auto shapeOutput = cast<MemRefType>(outputType).getShape();
+  auto shapeOperand = cast<MemRefType>(operandType).getShape();
+  return getBinFlags(shapeOutput, shapeOperand, operandNumber);
+}
+
+FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
+                                                Type outputType,
+                                                OperandPos operandNumber) {
+  assert(isa<ShapedType>(outputType) && "expect shaped type on output");
+  assert(cast<ShapedType>(outputType).getRank() == 2 &&
+         "expect rank 2 on output");
+
+  if (!isa<ShapedType>(operandType) ||
+      cast<ShapedType>(operandType).getRank() == 0) {
+    if (operandNumber == OperandPos::LHS)
+      return xsmm::BinaryFlags::BCAST_SCALAR_IN_0;
+    return xsmm::BinaryFlags::BCAST_SCALAR_IN_1;
+  }
+
+  enum class BCastType { NONE = 0, SCALAR, ROW, COL };
+  auto shapeOutput = cast<ShapedType>(outputType).getShape();
+  auto shapeOperand = cast<ShapedType>(operandType).getShape();
+  return getBinFlags(shapeOutput, shapeOperand, operandNumber);
+}
+
+FailureOr<int64_t> getLeadingDim(Type type, size_t pos) {
+  // Not shaped type, the leading dimension is the single scalar.
+  auto memref = dyn_cast<MemRefType>(type);
+  if (!memref)
+    return 1;
+  // For 1d memref we cannot use the stride as leading dimension, but the
+  // leading dimension is the dimension itself.
+  if (memref.getRank() == 1)
+    return memref.getShape()[0];
+
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (failed(getStridesAndOffset(memref, strides, offset)))
+    return failure();
+  // fail if the strides are non-constant
+  if (llvm::any_of(strides, [](int64_t stride) {
+        return stride == ShapedType::kDynamic;
+      }))
+    return failure();
+  return strides[pos];
+}
 
 SmallVector<Type> extractOperandTypes(OpBuilder &builder,
                                       SmallVector<XsmmOperand> operands) {
+
   SmallVector<Type> results;
   for (XsmmOperand operand : operands) {
     if (std::holds_alternative<int64_t>(operand))
@@ -582,6 +757,276 @@ template FailureOr<SmallVector<Attribute>>
 getBrgemmFlags<xsmm::FusedBrgemmDispatchOp>(
     PatternRewriter &rewriter, xsmm::FusedBrgemmDispatchOp dispatchOpTy,
     bool returnNone);
+
+// Access matcher.
+FailureOr<xsmm::BrgemmInfo> checkAccess(PatternRewriter &rewriter,
+                                        vector::ContractionOp contractOp,
+                                        unsigned m, unsigned n, unsigned k,
+                                        std::optional<unsigned> batchPos,
+                                        SmallVector<Value> inputs,
+                                        ArrayRef<AffineMap> indexingMap) {
+  Value operandA = inputs[0];
+  Value operandB = inputs[1];
+  Value operandC = inputs[2];
+
+  auto kPos = *xsmm::utils::getPosInCodomain(k, contractOp, indexingMap[0]);
+  auto checkStridesAndGetLdaAndBatch =
+      [&](int minorDim, int majorDim, Value operand, AffineMap indexingMap,
+          int operandIndex, std::optional<int> batchPos, bool isVnni,
+          int vnniFactor) -> FailureOr<std::pair<int64_t, int>> {
+    auto minorDimPosInCodomain =
+        xsmm::utils::getPosInCodomain(minorDim, contractOp, indexingMap);
+    auto majorDimPosInCodomain =
+        xsmm::utils::getPosInCodomain(majorDim, contractOp, indexingMap);
+    if (!minorDimPosInCodomain || !majorDimPosInCodomain) {
+      return failure();
+    }
+    MemRefType type;
+    if (operand.getDefiningOp() != NULL) {
+      if (isa<memref::ExpandShapeOp>(operand.getDefiningOp()) ||
+          isa<memref::SubViewOp>(operand.getDefiningOp())) {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getResult(0).getType());
+      } else if (isa<mlir::vector::TransferReadOp>(operand.getDefiningOp())) {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getOperand(0).getType());
+      } else {
+        type = dyn_cast<MemRefType>(
+            operand.getDefiningOp()->getOperand(0).getType());
+      }
+    } else if (isa<MemRefType>(operand.getType())) {
+      type = dyn_cast<MemRefType>(operand.getType());
+    }
+
+    auto stride = 1;
+    if (batchPos && batchPos.value() >= 0) {
+      auto batchPosCodomainA =
+          getPosInCodomain(batchPos.value(), contractOp, indexingMap);
+      auto stridesOnA = ::mlir::utils::getStaticStrides(type);
+      if (succeeded(stridesOnA) && batchPosCodomainA) {
+        stride = (*stridesOnA)[*batchPosCodomainA];
+      }
+    }
+
+    FailureOr<SmallVector<int64_t>> stridesOnOperand;
+    if (isVnni && operandIndex == 1) {
+      stridesOnOperand = getVNNIStaticStrides(type);
+    } else {
+      stridesOnOperand = ::mlir::utils::getStaticStrides(type);
+    }
+    if (failed(stridesOnOperand) ||
+        (!isVnni && (*stridesOnOperand)[*minorDimPosInCodomain] != 1)) {
+      return failure();
+    }
+
+    if (isVnni) {
+      if (operandIndex == 1) {
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 3) {
+          return std::make_pair(
+              (*stridesOnOperand)[*majorDimPosInCodomain] / vnniFactor, stride);
+        }
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
+          return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain] + 1,
+                                stride);
+        } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 1) {
+          return std::make_pair((long)vnniFactor, stride);
+        }
+      }
+    } else {
+      if (operandIndex == 0 && isVnni) {
+        if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 2) {
+          return std::make_pair((long)vnniFactor, stride);
+        } else if (*majorDimPosInCodomain == (*stridesOnOperand).size() - 3) {
+          return std::make_pair(
+              (*stridesOnOperand)[*majorDimPosInCodomain] / vnniFactor, stride);
+        }
+      }
+    }
+
+    return std::make_pair((*stridesOnOperand)[*majorDimPosInCodomain], stride);
+  };
+
+  auto vnniBlockingFactor =
+      vnni::utils::getVnniBlockingFactor(inputs[1].getType());
+  bool isVnni = false;
+  auto vnniFactor = 1;
+  if (vnniBlockingFactor) {
+    vnniFactor = *vnniBlockingFactor;
+    isVnni = succeeded(vnni::utils::isInVnniLayout(contractOp, vnniFactor));
+  }
+
+  auto ldaVal = checkStridesAndGetLdaAndBatch(k, m, operandA, indexingMap[0], 0,
+                                              batchPos, isVnni, vnniFactor);
+
+  if (failed(ldaVal)) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute lda\n");
+    return failure();
+  }
+  auto lda = (*ldaVal).first;
+  auto strideA = (*ldaVal).second;
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] Strides on "
+                             "A: OK "
+                          << lda << "\n");
+
+  auto ldbVal = checkStridesAndGetLdaAndBatch(n, k, operandB, indexingMap[1], 1,
+                                              batchPos, isVnni, vnniFactor);
+
+  if (failed(ldbVal)) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldb\n");
+    return failure();
+  }
+  auto ldb = (*ldbVal).first;
+  auto strideB = (*ldbVal).second;
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] Strides on "
+                             "B: OK "
+                          << ldb << "\n");
+
+  // C(m, n)
+  auto ldcVal = checkStridesAndGetLdaAndBatch(n, m, operandC, indexingMap[2], 2,
+                                              batchPos, isVnni, vnniFactor);
+  if (failed(ldcVal)) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to compute ldc\n");
+    return failure();
+  }
+  auto ldc = (*ldcVal).first;
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] Strides on "
+                             "C: OK "
+                          << ldc << "\n");
+  auto loops = computeStaticLoopSizes(contractOp, indexingMap);
+  int64_t batchVal = (batchPos) ? loops[batchPos.value()] : 0;
+  auto loopsK = loops[k];
+  if (isVnni && !batchVal &&
+      dyn_cast<ShapedType>(inputs[0].getType()).getRank() - 2 == kPos) {
+    loopsK *= vnniFactor;
+  }
+
+  xsmm::BrgemmInfo info{loops[m], loops[n], loopsK,  batchVal, lda,
+                        ldb,      ldc,      strideA, strideB,  isVnni};
+  return info;
+}
+// Check if the given
+// generic is mappable to a
+// brgemm xsmm op.
+// - It is a contraction,
+// with:
+// -- 1 m and 1 n and 2 k
+// dimensions.
+// -- m appears on the LHS
+// and OUT but not in RHS.
+// -- n appears on the RHS
+// and OUT but not in LHS.
+// -- k and k' appear on the
+// RHS and LHS but not OUT.
+// -- the stride of the
+// minor dimension for A, k
+// is 1.
+// -- the stride of the
+// minor dimension for B, n
+// is 1.
+// -- the stride of the
+// minor dimension for C, n
+// is 1.
+FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
+                                         vector::ContractionOp contractOp,
+                                         SmallVector<Value> &inputs,
+                                         SmallVector<Value> &output,
+                                         ArrayRef<AffineMap> indexingMap) {
+  auto contractionDims =
+      checkStructure(contractOp, inputs, output, indexingMap);
+  if (failed(contractionDims)) {
+    LLVM_DEBUG(llvm::dbgs() << "[isMappableToBr"
+                               "gemm] Failed "
+                               "on "
+                               "checkStructure"
+                               "\n");
+    return failure();
+  }
+  unsigned m = contractionDims->m.back();
+  unsigned n = contractionDims->n.back();
+  SmallVector<unsigned> kVector;
+  std::optional<unsigned> batch;
+  auto pos = xsmm::utils::getPosInCodomain(
+      contractionDims->k[0], contractOp, contractOp.getIndexingMapsArray()[0]);
+  int prevPos = -1;
+  int prevIndex = -1;
+  int index = 0;
+  bool isVnni = vnni::utils::isInVnniLayout(
+      dyn_cast<VectorType>(inputs[1].getType()).getRank(),
+      dyn_cast<VectorType>(inputs[1].getType()));
+
+  if (contractionDims->k.size() > 1) {
+    for (unsigned i = 1; i < contractionDims->k.size(); i++) {
+      auto posTwo =
+          xsmm::utils::getPosInCodomain(contractionDims->k[i], contractOp,
+                                        contractOp.getIndexingMapsArray()[0]);
+      if (*posTwo < *pos) {
+        prevPos = *pos;
+        prevIndex = index;
+        pos = posTwo;
+        index = i;
+      } else if (prevIndex == -1 || *posTwo < static_cast<unsigned>(prevPos)) {
+        prevPos = *posTwo;
+        prevIndex = i;
+      }
+    }
+  }
+
+  unsigned k;
+  if (prevIndex == -1 ||
+      (dyn_cast<ShapedType>(inputs[0].getType()).getRank() - 1 == prevPos &&
+       isVnni)) {
+    k = contractionDims->k[index];
+  } else {
+    batch = contractionDims->k[index];
+    k = contractionDims->k[prevIndex];
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] Candidate "
+                             "dims: "
+                          << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] m: "
+                          << m << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrge"
+                             "mm] n: "
+                          << n << "\n");
+  if (batch)
+    LLVM_DEBUG(llvm::dbgs() << "[isMappableToBr"
+                               "gemm] batch: "
+                            << batch << "\n");
+  else
+    LLVM_DEBUG(llvm::dbgs() << "[isMappableToBr"
+                               "gemm] no batch "
+                               "dim\n");
+  auto retval =
+      checkAccess(rewriter, contractOp, m, n, k, batch, inputs, indexingMap);
+  if (failed(retval)) {
+    LLVM_DEBUG(llvm::dbgs() << "Failed to check access\n");
+    return failure();
+  }
+  return retval;
+}
+
+int64_t getOredFlags(ArrayAttr flags) {
+  int64_t oredFlag = 0;
+  for (auto flag : flags) {
+    int64_t intAttr = dyn_cast<IntegerAttr>(flag).getInt();
+    // LIBXSMM is col-major, swap A and B flags.
+    if (auto gemmFlag = dyn_cast_or_null<xsmm::GemmFlagsAttr>(flag)) {
+      if (gemmFlag.getValue() == GemmFlags::VNNI_A)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_B);
+      if (gemmFlag.getValue() == GemmFlags::VNNI_B)
+        intAttr = static_cast<int64_t>(GemmFlags::VNNI_A);
+    }
+    oredFlag |= intAttr;
+  }
+  return oredFlag;
+}
+
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir

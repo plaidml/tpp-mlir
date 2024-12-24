@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 #include "TPP/Conversion/ConvertVectorToXsmm/ConvertVectorToXsmm.h"
 #include "TPP/Dialect/Xsmm/XsmmUtils.h"
+#include "TPP/Transforms/Transforms.h"
+#include "TPP/Transforms/Utils/TransformUtils.h"
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "TPP/Transforms/Utils/ValueUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -68,9 +70,9 @@ getUnaryXSMMCalls(PatternRewriter &rewriter, xsmm::UnaryInfo &unaryInfo,
 }
 
 static std::pair<Operation *, Operation *>
-convertTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
-                   Operation *input, Operation *output, Type outputType) {
-  LLVM_DEBUG(llvm::dbgs() << "convertTransposeOp\n");
+convertTranspose(PatternRewriter &rewriter, Operation *transposeOp,
+                 Operation *input, Operation *output, Type outputType) {
+  LLVM_DEBUG(llvm::dbgs() << "convertTranspose\n");
   VectorType outType = cast<VectorType>(outputType);
   xsmm::UnaryKind opType;
   xsmm::UnaryInfo unaryInfo;
@@ -111,11 +113,10 @@ convertTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
                            output, transposeOp, unaryFlags.getInt());
 }
 
-static LogicalResult validateTransposeOp(PatternRewriter &rewriter,
-                                         Operation *transposeOp,
-                                         Operation *input, Operation *output,
-                                         Type outputType) {
-  LLVM_DEBUG(llvm::dbgs() << "validateTransposeOp\n");
+static LogicalResult validateTranspose(PatternRewriter &rewriter,
+                                       Operation *transposeOp, Operation *input,
+                                       Operation *output, Type outputType) {
+  LLVM_DEBUG(llvm::dbgs() << "validateTranspose\n");
   Value result = input->getResult(0);
   Value source = input->getOperand(0);
   VectorType outType = cast<VectorType>(outputType);
@@ -187,10 +188,10 @@ convertBroadcast(PatternRewriter &rewriter, Operation *broadcastOp,
                            broadcastOp, unaryFlags.getInt());
 }
 
-static LogicalResult validateBroadcastOp(PatternRewriter &rewriter,
-                                         Operation *broadcastOp,
-                                         Operation *input, Operation *output) {
-  LLVM_DEBUG(llvm::dbgs() << "validateBroadcastOp\n");
+static LogicalResult validateBroadcast(PatternRewriter &rewriter,
+                                       Operation *broadcastOp, Operation *input,
+                                       Operation *output) {
+  LLVM_DEBUG(llvm::dbgs() << "validateBroadcast\n");
   auto unaryFlag = xsmm::utils::getUnaryFlags(input->getOperand(0).getType(),
                                               output->getOperand(1).getType());
   auto inputMemRefType = dyn_cast<MemRefType>(input->getOperand(0).getType());
@@ -205,15 +206,162 @@ static LogicalResult validateBroadcastOp(PatternRewriter &rewriter,
   return success();
 }
 
+FailureOr<xsmm::BrgemmInfo>
+computeBrgemmInfo(PatternRewriter &rewriter, Operation *contractOp,
+                  Operation *input0, Operation *input1, Operation *input2) {
+  SmallVector<Value> inputs;
+  LLVM_DEBUG(llvm::dbgs() << "computeBrgemminfo\n");
+
+  inputs.push_back(input0->getResult(0));
+  inputs.push_back(input1->getResult(0));
+  inputs.push_back(input2->getResult(0));
+
+  SmallVector<Value> outputs;
+  outputs.push_back(nullptr);
+  auto failedOrbrgemmInfo = mlir::xsmm::utils::isMappableToBrgemm(
+      rewriter, dyn_cast<mlir::vector::ContractionOp>(contractOp), inputs,
+      outputs,
+      dyn_cast<mlir::vector::ContractionOp>(contractOp).getIndexingMapsArray());
+  if (failed(failedOrbrgemmInfo))
+    return failure();
+  xsmm::BrgemmInfo brgemmInfo = *failedOrbrgemmInfo;
+  return brgemmInfo;
+}
+
+static std::pair<Operation *, Operation *>
+createBrgemmImpl(PatternRewriter &rewriter, Operation *contractOp, Value input0,
+                 Value input1, Value input2, xsmm::BrgemmInfo brgemmInfo,
+                 SmallVector<Attribute> flags) {
+  SmallVector<Value> inputs;
+  inputs.push_back(input0);
+  inputs.push_back(input1);
+  inputs.push_back(input2);
+  auto m = brgemmInfo.m;
+  auto n = brgemmInfo.n;
+  auto k = brgemmInfo.k;
+  auto batch = brgemmInfo.batch;
+  int64_t lda = brgemmInfo.lda;
+  int64_t ldb = brgemmInfo.ldb;
+  int64_t ldc = brgemmInfo.ldc;
+  int64_t strideA = brgemmInfo.strideA;
+  int64_t strideB = brgemmInfo.strideB;
+  auto loc = contractOp->getLoc();
+  auto dtype =
+      xsmm::utils::getDataType(rewriter, contractOp->getOperand(0).getType());
+  SmallVector<xsmm::utils::XsmmOperand> dispatchOperands;
+  // Dispatch the data type.
+  dispatchOperands.push_back(dyn_cast<DataTypeAttr>(dtype).getInt());
+
+  ArrayAttr brgemmFlags = rewriter.getArrayAttr(flags);
+  SmallVector<Value, 10> invokeOperands;
+  std::string dispatchName = "xsmm_gemm_dispatch";
+  std::string invokeName = "xsmm_gemm_invoke";
+
+  if (batch != 0) {
+    dispatchName = "xsmm_brgemm_dispatch";
+    invokeName = "xsmm_brgemm_invoke";
+  }
+
+  dispatchOperands.append(
+      SmallVector<xsmm::utils::XsmmOperand>{m, n, k, lda, ldb, ldc});
+  if (batch != 0) {
+    dispatchOperands.push_back(strideA);
+    dispatchOperands.push_back(strideB);
+  }
+  int64_t oredFlag = xsmm::utils::getOredFlags(brgemmFlags);
+  dispatchOperands.push_back(oredFlag);
+
+  auto dispatchCall = xsmm::utils::buildXsmmCall(
+      rewriter, xsmm::utils::XsmmCallType::DISPATCH, loc, dtype,
+      dispatchOperands, IntegerType::get(rewriter.getContext(), 64),
+      SymbolRefAttr::get(contractOp->getContext(), dispatchName), contractOp,
+      nullptr);
+
+  SmallVector<xsmm::utils::XsmmOperand> operandRange{
+      dyn_cast<DataTypeAttr>(dtype).getInt(),
+      xsmm::utils::XsmmCall{xsmm::utils::XsmmCallType::DISPATCH,
+                            dispatchCall.getResult(0)},
+      input0.getDefiningOp()->getOperand(0),
+      input1.getDefiningOp()->getOperand(0),
+      input2.getDefiningOp()->getOperand(0)};
+
+  if (batch != 0) {
+    operandRange.push_back(batch);
+  }
+  auto invokeCall = xsmm::utils::buildXsmmCall(
+      rewriter, xsmm::utils::XsmmCallType::INVOKE, loc, dtype, operandRange,
+      TypeRange(), SymbolRefAttr::get(contractOp->getContext(), invokeName),
+      contractOp, input2.getDefiningOp());
+  return std::make_pair(&*dispatchCall, &*invokeCall);
+}
+
+static std::pair<Operation *, Operation *>
+createBrgemmWithBetaZero(PatternRewriter &rewriter, Operation *contractOp,
+                         Operation *input0, Operation *input1,
+                         Operation *input2, Operation *betaZero) {
+  LLVM_DEBUG(llvm::dbgs() << "createBrgemmWithBetaZero\n");
+  auto brgemmInfo =
+      computeBrgemmInfo(rewriter, contractOp, input0, input1, input2);
+  SmallVector<Attribute> flags;
+  if (brgemmInfo->isVnni) {
+    flags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                             xsmm::GemmFlags::VNNI_B));
+  }
+  flags.push_back(
+      xsmm::GemmFlagsAttr::get(rewriter.getContext(), xsmm::GemmFlags::BETA_0));
+
+  return createBrgemmImpl(rewriter, contractOp, input0->getResult(0),
+                          input1->getResult(0), input2->getResult(0),
+                          *brgemmInfo, flags);
+}
+
+static std::pair<Operation *, Operation *>
+createBrgemm(PatternRewriter &rewriter, Operation *contractOp,
+             Operation *input0, Operation *input1, Operation *input2) {
+  LLVM_DEBUG(llvm::dbgs() << "createBrgemm\n");
+  FailureOr<mlir::xsmm::BrgemmInfo> brgemmInfo;
+  brgemmInfo = computeBrgemmInfo(rewriter, contractOp, input0, input1, input2);
+  SmallVector<Attribute> flags;
+  if (brgemmInfo->isVnni) {
+    flags.push_back(xsmm::GemmFlagsAttr::get(rewriter.getContext(),
+                                             xsmm::GemmFlags::VNNI_B));
+  }
+
+  return createBrgemmImpl(rewriter, contractOp, input0->getResult(0),
+                          input1->getResult(0), input2->getResult(0),
+                          *brgemmInfo, flags);
+}
+
+static LogicalResult validateBrgemm(PatternRewriter &rewriter,
+                                    Operation *contractOp, Operation *input0,
+                                    Operation *input1, Operation *input2,
+                                    Operation *result) {
+  LLVM_DEBUG(llvm::dbgs() << "validateBrgemm\n");
+  FailureOr<xsmm::BrgemmInfo> brgemmInfo =
+      computeBrgemmInfo(rewriter, contractOp, input0, input1, input2);
+
+  if (failed(brgemmInfo)) {
+    return failure(contractOp);
+  }
+
+  return success(contractOp);
+}
+
 static void registerNativeRewrite(RewritePatternSet &patterns) {
   patterns.getPDLPatterns().registerRewriteFunction("ConvertTranspose",
-                                                    convertTransposeOp);
+                                                    convertTranspose);
   patterns.getPDLPatterns().registerConstraintFunction("ValidateTranspose",
-                                                       validateTransposeOp);
+                                                       validateTranspose);
   patterns.getPDLPatterns().registerRewriteFunction("ConvertBroadcast",
                                                     convertBroadcast);
   patterns.getPDLPatterns().registerConstraintFunction("ValidateBroadcast",
-                                                       validateBroadcastOp);
+                                                       validateBroadcast);
+  patterns.getPDLPatterns().registerRewriteFunction("CreateBrgemmWithBetaZero",
+                                                    createBrgemmWithBetaZero);
+  patterns.getPDLPatterns().registerRewriteFunction("CreateBrgemm",
+                                                    createBrgemm);
+  patterns.getPDLPatterns().registerConstraintFunction("ValidateBrgemm",
+                                                       validateBrgemm);
 }
 
 namespace mlir {

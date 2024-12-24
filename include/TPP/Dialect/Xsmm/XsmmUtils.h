@@ -22,12 +22,33 @@ class Operation;
 class PatternRewriter;
 class VectorType;
 class MemRefType;
+class ModuleOp;
 
 namespace func {
 class CallOp;
 }
 
+namespace vector {
+class ContractionOp;
+}
+
 namespace xsmm {
+
+struct BrgemmInfo {
+  int64_t m;
+  int64_t n;
+  int64_t k;
+  int64_t batch;
+
+  int64_t lda;
+  int64_t ldb;
+  int64_t ldc;
+  int64_t strideA;
+  int64_t strideB;
+
+  bool isVnni = false;
+};
+
 class UnaryKindAttr;
 
 struct UnaryInfo {
@@ -89,8 +110,14 @@ FailureOr<UnaryFlags> getUnaryFlags(Type inputType, Type outputType);
 
 // Compute the broadcasting flags for 'operandType' based on 'outputType'.
 enum class OperandPos { LHS = 0, RHS = 1 };
+FailureOr<BinaryFlags> getBinFlags(ArrayRef<int64_t> shapeOutput,
+                                   ArrayRef<int64_t> shapeOperand,
+                                   OperandPos operandNumber);
 FailureOr<BinaryFlags> getBinaryFlags(Type operandType, Type outputType,
                                       OperandPos operandNumber);
+FailureOr<BinaryFlags> getBinaryFlagsVectorType(Type operandType,
+                                                Type outputType,
+                                                OperandPos operandNumber);
 
 FailureOr<FusedMatch> getFusedBrgemmSequenceFromProducer(Operation *op);
 
@@ -98,10 +125,26 @@ ArrayAttr getUnaryDispatchFlags(UnaryOp op);
 
 ArrayAttr getBinaryDispatchFlags(BinaryOp op);
 
+int64_t getOredFlags(ArrayAttr flags);
+
+func::CallOp buildInvokeCall(RewriterBase &rewriter, Operation *parentOp,
+                             ModuleOp module, SmallVector<Value> inputOperands,
+                             SmallVector<Value> prependValues, int prependIndex,
+                             SmallVector<Value> operands, StringRef invokeName,
+                             DataTypeAttr dtype, bool getResults = false);
+
 template <typename DispatchOpTy>
 FailureOr<SmallVector<Attribute>> getBrgemmFlags(PatternRewriter &rewriter,
                                                  DispatchOpTy dispatchOpTy,
                                                  bool returnNone);
+std::optional<unsigned>
+getPosInCodomain(unsigned dim, vector::ContractionOp contractOp, AffineMap map);
+FailureOr<xsmm::BrgemmInfo> checkAccess(PatternRewriter &rewriter,
+                                        vector::ContractionOp contractOp,
+                                        unsigned m, unsigned n, unsigned k,
+                                        std::optional<unsigned> batchPos,
+                                        SmallVector<Value> inputs,
+                                        ArrayRef<AffineMap> indexingMap);
 
 SmallVector<Type> extractOperandTypes(OpBuilder &builder,
                                       ArrayRef<Value> operands);
@@ -122,6 +165,11 @@ func::CallOp buildXsmmCall(RewriterBase &rewriter, XsmmCallType callType,
                            SmallVector<XsmmOperand> operands, TypeRange results,
                            FlatSymbolRefAttr fnName, Operation *parentOp,
                            Operation *insertBefore);
+FailureOr<BrgemmInfo> isMappableToBrgemm(PatternRewriter &rewriter,
+                                         vector::ContractionOp contractOp,
+                                         SmallVector<Value> &inputs,
+                                         SmallVector<Value> &output,
+                                         ArrayRef<AffineMap> indexingMap);
 } // namespace utils
 } // namespace xsmm
 } // namespace mlir
