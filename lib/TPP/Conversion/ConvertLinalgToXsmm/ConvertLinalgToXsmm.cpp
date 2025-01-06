@@ -1103,7 +1103,12 @@ struct ConvertGenericToVnniMatmulLikeOp
     int64_t kPos = 1;
     if (hasBatch)
       kPos++;
-    int64_t k = cast<ShapedType>(bufferA.getType()).getShape()[kPos];
+    // Take the whole reduction dim size. Account for the VNNI factor that
+    // splits the K dim in the shape.
+    std::optional<int64_t> vnniFactor =
+        vnni::utils::getVnniBlockingFactor(bufferB.getType());
+    int64_t k =
+        cast<ShapedType>(bufferA.getType()).getShape()[kPos] * *vnniFactor;
     int64_t batch = 0;
     if (hasBatch)
       batch = cast<ShapedType>(bufferA.getType()).getShape()[0];
@@ -1125,8 +1130,7 @@ struct ConvertGenericToVnniMatmulLikeOp
     if (hasBatch)
       leadingDimPosOnAandB++;
     int64_t lda = (*stridesOnLhs)[leadingDimPosOnAandB];
-    int64_t ldb = (*stridesOnRhs)[leadingDimPosOnAandB] /
-                  *vnni::utils::getVnniBlockingFactor(bufferB.getType());
+    int64_t ldb = (*stridesOnRhs)[leadingDimPosOnAandB] / *vnniFactor;
     int64_t ldc = (*stridesOnOutput)[0];
 
     BrgemmInfo brgemmInfo{m,   n,   k,       batch,   lda,

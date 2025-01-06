@@ -56,7 +56,7 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
           .operation(NumOfLoops(_OR(EqualsTo(5), EqualsTo(4))))
           .input(MatchAll(), HasStaticShape())
           .output(MatchAll(), HasStaticShape())
-          .input(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &mapOperandA))
+          .input(MatchOne(0), HasMap(Any(), &mapOperandA))
           .input(MatchOne(1), HasMap(Any(), &mapOperandB))
           .output(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &mapOperandC))
           .region(MatchOne(0),
