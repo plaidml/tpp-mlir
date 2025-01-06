@@ -45,15 +45,16 @@
 // DP4-NOT: dealloc
 
 
-// GENERIC: #[[$ATTR_0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
-// GENERIC: #[[$ATTR_1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
+// GENERIC: #[[$ATTR_0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6, d3)>
+// GENERIC: #[[$ATTR_1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6, d5, d3)>
 // GENERIC: #[[$ATTR_2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
 
 // GENERIC-LABEL:   func.func @entry(
 // GENERIC-SAME:                     %[[VAL_0:.*]]: tensor<2x36x64x64xbf16>,
 // GENERIC-SAME:                     %[[VAL_1:.*]]: tensor<16x36x32x48x2xbf16>,
 // GENERIC-SAME:                     %[[VAL_2:.*]]: tensor<2x16x64x48xbf16>) -> tensor<2x16x64x48xbf16> {
-// GENERIC:           %[[VAL_3:.*]] = linalg.generic {indexing_maps = [#[[$ATTR_0]], #[[$ATTR_1]], #[[$ATTR_2]]], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%[[VAL_0]], %[[VAL_1]] : tensor<2x36x64x64xbf16>, tensor<16x36x32x48x2xbf16>) outs(%[[VAL_2]] : tensor<2x16x64x48xbf16>) {
+// GENERIC:           %[[VNNI_A:.+]] = tensor.expand_shape %[[VAL_0]] {{\[}}[0], [1], [2], [3, 4]] output_shape [2, 36, 64, 32, 2] : tensor<2x36x64x64xbf16> into tensor<2x36x64x32x2xbf16>
+// GENERIC:           %[[VAL_3:.*]] = linalg.generic {indexing_maps = [#[[$ATTR_0]], #[[$ATTR_1]], #[[$ATTR_2]]], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%[[VNNI_A]], %[[VAL_1]] : tensor<2x36x64x32x2xbf16>, tensor<16x36x32x48x2xbf16>) outs(%[[VAL_2]] : tensor<2x16x64x48xbf16>) {
 // GENERIC:           ^bb0(%[[VAL_4:.*]]: bf16, %[[VAL_5:.*]]: bf16, %[[VAL_6:.*]]: bf16):
 // GENERIC:             %[[VAL_7:.*]] = arith.mulf %[[VAL_4]], %[[VAL_5]] : bf16
 // GENERIC:             %[[VAL_8:.*]] = arith.addf %[[VAL_6]], %[[VAL_7]] : bf16

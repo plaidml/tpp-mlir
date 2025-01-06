@@ -146,16 +146,18 @@ func.func @mha_projection(%arg0: memref<512x8x64xf32>, %arg1: memref<64x32x512xf
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -174,17 +176,49 @@ func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
+
+func.func @expanded_arg_vnni_gemm(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
+  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  linalg.generic {
+    indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+    ins(%arg0, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+        %1 = arith.mulf %in, %in_2 : bf16
+        %2 = arith.addf %out, %1 : bf16
+        linalg.yield %2 : bf16
+    }
+  return
+}
+
+// CHECK-LABEL: expanded_arg_vnni_gemm
+// CHECK-SAME:  %[[ARG0:.+]]: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
+// CHECK-SAME:  %[[ARG1:.+]]: memref<32x64x2xbf16>,
+// CHECK-SAME:  %[[ARG2:.+]]: memref<64x64xbf16, strided<[64, 1], offset: ?>>
+// CHECK: %[[COLLAPSE:.+]] = memref.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]]
+// CHECK-SAME: : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>> into memref<64x64xbf16, strided<[64, 1], offset: ?>>
+// CHECK: %[[DIS:.+]] = xsmm.gemm.dispatch [64, 64, 64, 64, 64, 64] flags = (vnni_b) data_type = bf16
+// CHECK: xsmm.gemm(data_type = bf16, %[[DIS]], %[[COLLAPSE]], %[[ARG1]], %[[ARG2]])
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on C, before mapping to vnni Gemm.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -200,17 +234,19 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 5, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Not VNNI layout. A factor of 5 is not VNNI.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160, 1], offset: ?>>,
+  %arg1: memref<32x64x5xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 5]
+    : memref<64x160xbf16, strided<[160, 1], offset: ?>> into memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>, memref<32x64x5xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -226,17 +262,17 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d3, d1)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d3, d1, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on A, before mapping to vnni Gemm.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+func.func @expect_not_to_match_vnni_gemm(%arg0: memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
+    ins(%arg0, %arg1 : memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -252,18 +288,20 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d2 floordiv 2, d1, d3)>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d1, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 
 // Make sure we can handle interchange on the iterators, but with the right
 // access patterns.
 func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<32x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -282,17 +320,19 @@ func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], off
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3 floordiv 2)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Not VNNI layout. The VNNI is not innermost in the access pattern for B.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x64xbf16, strided<[64, 1], offset: ?>>, memref<2x64x32xbf16>)
+    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<2x64x32xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -309,16 +349,18 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 8, 2]
+    : memref<64x16xbf16, strided<[64, 1], offset: ?>> into memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x16xbf16, strided<[64, 1], offset: ?>>, memref<8x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
     outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
@@ -337,16 +379,18 @@ func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offse
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 func.func @non_square_vnni_gemm_1(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
   %arg1: memref<8x64x2xbf16>, %arg2: memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [4, 8, 2]
+    : memref<4x16xbf16, strided<[64, 1], offset: ?>> into memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<4x16xbf16, strided<[64, 1], offset: ?>>, memref<8x64x2xbf16>)
+    ins(%expanded, %arg1 : memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
     outs(%arg2 : memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16

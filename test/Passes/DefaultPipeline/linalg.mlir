@@ -199,8 +199,8 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: func.func @brgemm_bf16
@@ -224,10 +224,12 @@ func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
   // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
   // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [64, 4, 2, 2]
+    : memref<64x4x4xbf16> into memref<64x4x2x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x4x4xbf16>, memref<64x2x4x2xbf16>)
+    ins(%expanded, %arg1 : memref<64x4x2x2xbf16>, memref<64x2x4x2xbf16>)
     outs(%arg2 : memref<4x4xbf16>) {
       ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
         %5 = arith.mulf %in, %in_5 : bf16
