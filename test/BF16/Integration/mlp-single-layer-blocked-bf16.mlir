@@ -2,8 +2,8 @@
 // RUN:  -e entry -entry-point-result=void | \
 // RUN: FileCheck %s
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d0, d1)>
@@ -26,10 +26,12 @@ func.func @entry(){
     scf.for %arg5 = %c0 to %c16 step %c1 {
       %subview_3 = memref.subview %wt_alloc[%arg5, 0, 0, 0, 0] [1, 64, 2, 4, 2] [1, 1, 1, 1, 1] : memref<128x64x2x4x2xbf16> to memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>
       %subview_4 = memref.subview %subview_2[%arg5, 0, 0] [1, 4, 4] [1, 1, 1] : memref<128x4x4xbf16, strided<[16, 4, 1], offset: ?>> to memref<4x4xbf16, strided<[4, 1], offset: ?>>
+      %expanded = memref.expand_shape %subview [[0], [1], [2, 3]] output_shape [64, 4, 2, 2]
+        : memref<64x4x4xbf16, strided<[16, 4, 1], offset: ?>> into memref<64x4x2x2xbf16, strided<[16, 4, 2, 1], offset: ?>>
       linalg.generic {
         indexing_maps = [#map, #map1, #map2],
         iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-        ins(%subview, %subview_3 : memref<64x4x4xbf16, strided<[16, 4,1], offset:?>>,
+        ins(%expanded, %subview_3 : memref<64x4x2x2xbf16, strided<[16, 4, 2, 1], offset: ?>>,
                                    memref<64x2x4x2xbf16, strided<[16, 8, 2, 1], offset: ?>>)
       outs(%subview_4 : memref<4x4xbf16, strided<[4, 1], offset: ?>>) {
         ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
