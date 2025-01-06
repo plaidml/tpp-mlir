@@ -14,7 +14,7 @@ func.func @brgemm(%arg0: tensor<32x4x4xbf16>, %arg1: tensor<32x4x4xbf16>,
 // CHECK-LABEL: brgemm
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<32x4x4xbf16>, %[[ARG1:.+]]: tensor<32x4x4xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4xbf16>
-// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] [[0], [1], [2, 3]] output_shape [32, 4, 2, 2] : tensor<32x4x4xbf16> into tensor<32x4x2x2xbf16>
+// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0], [1], [2, 3]] output_shape [32, 4, 2, 2] : tensor<32x4x4xbf16> into tensor<32x4x2x2xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<32x2x4x2xbf16>
 // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]]
 // CHECK-SAME:  inner_dims_pos = [1] inner_tiles = [2] into %[[EMPTY]]
@@ -68,7 +68,7 @@ func.func @prepacked_matmul(%pack: tensor<4x4x32x32xbf16>, %pack_0: tensor<4x4x3
 // CHECK-LABEL: prepacked_matmul
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<4x4x32x32xbf16>, %[[ARG1:.+]]: tensor<4x4x32x32xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: tensor<4x4x32x32xbf16>
-// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] [[0], [1], [2], [3, 4]]
+// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0], [1], [2], [3, 4]]
 // CHECK-SAME: output_shape [4, 4, 32, 16, 2] : tensor<4x4x32x32xbf16> into tensor<4x4x32x16x2xbf16>
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x4x16x32x2xbf16>
 // CHECK: %[[PACK:.+]] = tensor.pack %[[ARG1]] inner_dims_pos = [2] inner_tiles = [2] into %[[EMPTY]]
