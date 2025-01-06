@@ -615,7 +615,8 @@ static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
   unsigned n = contractionDims->n[0];
   unsigned k = contractionDims->k.back();
   std::optional<unsigned> batch;
-  if (contractionDims->k.size() == 3)
+  unsigned extraVnniRed = vnni::utils::isInVnniLayout(linalgOp);
+  if (contractionDims->k.size() == (2 + extraVnniRed))
     batch = contractionDims->k.front();
 
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Candidate dims: "
