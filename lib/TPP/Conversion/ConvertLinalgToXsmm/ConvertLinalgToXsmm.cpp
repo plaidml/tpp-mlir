@@ -792,7 +792,8 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   if (!isVnni && !isInnerMostDim(operandA, *minorKInCodomainOpA)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for A\n");
-    assert(isInnerMostDim(operandA, *minorMInCodomainOpA));
+    if (!isInnerMostDim(operandA, *minorMInCodomainOpA))
+      return failure();
     emitTransposeOnOperand(rewriter, linalgOp, operandA, *minorKInCodomainOpA,
                            *minorMInCodomainOpA);
   }
@@ -801,7 +802,8 @@ makeMinorDimensionsInnerMost(RewriterBase &rewriter, linalg::GenericOp linalgOp,
   if (!isVnni && !isInnerMostDim(operandB, *minorNInCodomainOpB)) {
     LLVM_DEBUG(llvm::dbgs()
                << "[makeMinorDimensionsInnerMost] emit transpose for B\n");
-    assert(isInnerMostDim(operandB, *minorKInCodomainOpB));
+    if (!isInnerMostDim(operandB, *minorKInCodomainOpB))
+      return failure();
     emitTransposeOnOperand(rewriter, linalgOp, operandB, *minorKInCodomainOpB,
                            *minorNInCodomainOpB);
   }
@@ -814,7 +816,7 @@ void ConvertLinalgToXsmm::runOnOperation() {
   IRRewriter rewriter(&getContext());
 
   // Enable conversion for linalg.generic to XSMM Brgemm if possible.
-  auto res = getOperation()->walk([&](linalg::GenericOp genericOp) {
+  getOperation()->walk([&](linalg::GenericOp genericOp) {
     auto contractionDims = checkStructure(genericOp);
     // If the generic does not match the structure of a Brgemm op, skip it.
     if (failed(contractionDims))
@@ -830,15 +832,11 @@ void ConvertLinalgToXsmm::runOnOperation() {
       // The generic is a Brgemm but the strides of the selected dims (m, n, k)
       // are not unit strides. Inject transposes to bring them innermost.
       if (failed(makeMinorDimensionsInnerMost(rewriter, genericOp, m, n, k))) {
-        return WalkResult::interrupt();
+        return WalkResult::skip();
       }
     }
     return WalkResult::advance();
   });
-  if (res.wasInterrupted()) {
-    LLVM_DEBUG(llvm::dbgs() << "pass failed!\n");
-    return signalPassFailure();
-  }
   SmallVector<StringRef> skipPatterns(skipOperations.begin(),
                                       skipOperations.end());
   tpp::populateLinalgToXsmmPatterns(patterns, skipPatterns);

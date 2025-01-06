@@ -236,7 +236,7 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
-#map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 // Not VNNI layout. A factor of 5 is not VNNI.
 func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160, 1], offset: ?>>,
