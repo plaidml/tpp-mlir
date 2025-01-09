@@ -1113,7 +1113,9 @@ struct ConvertGenericToVnniMatmulLikeOp
     // by the earlier check) that splits the K dim in the shape.
     std::optional<int64_t> vnniFactor =
         vnni::utils::getVnniBlockingFactor(bufferB.getType());
-    assert(vnniFactor && "Must be in VNNI format");
+    if (!vnniFactor)
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "failed to determine VNNI factor");
     int64_t k =
         cast<ShapedType>(bufferA.getType()).getShape()[kPos] * *vnniFactor;
     int64_t batch = 0;
