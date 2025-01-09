@@ -455,7 +455,8 @@ static void replaceOpWithGemmLikeOp(RewriterBase &rewriter,
   SmallVector<Value> invokeOperands;
   SmallVector<Value> inputs = {linalgOp->getOperands()};
 
-  // Collapse VNNI factor dimension for matrix A.
+  // Collapse VNNI factor dimension for matrix A:
+  // A <32x8x2> -> A <32x16>
   if (brgemmInfo.isVnni) {
     auto rankA = cast<ShapedType>(inputs[0].getType()).getRank();
     assert(rankA >= 3 && "Invalid A mat rank for VNNI");
@@ -514,7 +515,7 @@ checkStructure(linalg::LinalgOp linalgOp) {
     return failure();
   }
   if (contractionDims->m.size() != 1 || contractionDims->n.size() != 1 ||
-      (contractionDims->k.size() > 3 || contractionDims->k.size() < 1) ||
+      contractionDims->k.size() > 3 || contractionDims->k.size() < 1 ||
       contractionDims->batch.size() != 0) {
     LLVM_DEBUG(llvm::dbgs() << "[checkStructure] Wrong dimensions\n");
     return failure();
@@ -596,7 +597,7 @@ static FailureOr<BrgemmInfo> checkAccess(linalg::LinalgOp linalgOp, unsigned m,
 
 // Check if the given generic is mappable to a brgemm xsmm op.
 // - It is a contraction, with:
-// -- 1 m and 1 n and 2 k dimensions.
+// -- 1 m, 1 n, and 2 or 3 (VNNI) k dimensions.
 // -- m appears on the LHS and OUT but not in RHS.
 // -- n appears on the RHS and OUT but not in LHS.
 // -- k and k' appear on the RHS and LHS but not OUT.
@@ -614,9 +615,15 @@ static FailureOr<BrgemmInfo> isMappableToBrgemm(linalg::LinalgOp linalgOp) {
   unsigned m = contractionDims->m[0];
   unsigned n = contractionDims->n[0];
   unsigned k = contractionDims->k.back();
+
+  // Check if there is a batch reduce dimension.
+  // At least one K-dim is the GEMM reduction.
+  // In case of VNNI layout, there is additional reduction dimension
+  // representing VNNI blocking factor.
   std::optional<unsigned> batch;
-  unsigned extraVnniDim = vnni::utils::isInVnniLayout(linalgOp);
-  if (contractionDims->k.size() == (2 + extraVnniDim))
+  unsigned numBrgemmReductionDims =
+      vnni::utils::isInVnniLayout(linalgOp) ? 3 : 2;
+  if (contractionDims->k.size() == numBrgemmReductionDims)
     batch = contractionDims->k.front();
 
   LLVM_DEBUG(llvm::dbgs() << "[isMappableToBrgemm] Candidate dims: "
@@ -1086,11 +1093,11 @@ struct ConvertGenericToVnniMatmulLikeOp
       return rewriter.notifyMatchFailure(genericOp, "expects buffer semantics");
     }
 
-    auto [isBrgemmOp, hasBatch] = structured_match::utils::isBrgemmVnniOp(
+    auto [isMatmulVnni, hasBatch] = structured_match::utils::isMatmulVnniOp(
         genericOp, /*operands=*/nullptr);
-    if (!isBrgemmOp) {
+    if (!isMatmulVnni) {
       return rewriter.notifyMatchFailure(
-          genericOp, "expects an operation mappable to brgemm");
+          genericOp, "expects an operation mappable to VNNI contraction");
     }
 
     Value bufferA = genericOp.getDpsInputs()[0];
@@ -1102,10 +1109,11 @@ struct ConvertGenericToVnniMatmulLikeOp
     int64_t kPos = 1;
     if (hasBatch)
       kPos++;
-    // Take the whole reduction dim size. Account for the VNNI factor that
-    // splits the K dim in the shape.
+    // Take the whole reduction dim size. Account for the VNNI factor (ensured
+    // by the earlier check) that splits the K dim in the shape.
     std::optional<int64_t> vnniFactor =
         vnni::utils::getVnniBlockingFactor(bufferB.getType());
+    assert(vnniFactor && "Must be in VNNI format");
     int64_t k =
         cast<ShapedType>(bufferA.getType()).getShape()[kPos] * *vnniFactor;
     int64_t batch = 0;

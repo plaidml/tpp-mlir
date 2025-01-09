@@ -44,6 +44,16 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
 
+  auto matA = linalgOp->getOperand(0);
+  auto matB = linalgOp->getOperand(1);
+  auto typeA = dyn_cast<ShapedType>(matA.getType());
+  auto typeB = dyn_cast<ShapedType>(matB.getType());
+  unsigned rankA = typeA.getRank();
+  unsigned rankB = typeB.getRank();
+  // VNNI format requires at least 1 parallel and 2 reduction dimensions.
+  if (rankA < 3 || rankB < 3)
+    return false;
+
   FailureOr<linalg::ContractionDimensions> dims =
       linalg::inferContractionDims(linalgOp);
   if (failed(dims))
@@ -54,12 +64,6 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   if (dims->k.size() < 2)
     return false;
 
-  auto matA = linalgOp->getOperand(0);
-  auto matB = linalgOp->getOperand(1);
-
-  auto typeA = dyn_cast<ShapedType>(matA.getType());
-  auto typeB = dyn_cast<ShapedType>(matB.getType());
-
   // Validate affine maps - VNNI computation should be defined by the two
   // innermost reduction iterators.
   // The input matrix dimensions layout must match the following:
@@ -69,8 +73,6 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
       linalgOp.getIteratorTypesArray();
   AffineMap mapA = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(0));
   AffineMap mapB = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(1));
-  unsigned rankA = typeA.getRank();
-  unsigned rankB = typeB.getRank();
 
   auto vnniDimA = dyn_cast<AffineDimExpr>(mapA.getResult(rankA - 1));
   auto vnniDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 1));

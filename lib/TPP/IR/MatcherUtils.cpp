@@ -35,9 +35,9 @@ getIteratorPos(linalg::LinalgOp linalgOp, AffineMap indexingMap,
   return res;
 }
 
-// Return true if the linalg.generic can be mapped to a brgemm in VNNI
-// format.
-std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
+// Return true if the linalg.generic can be mapped to a matmul (GEMM or BRGEMM)
+// in VNNI format.
+std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
                                      SmallVectorImpl<Value> *operands) {
   bool hasBatch = false;
   auto blockingFactor =
@@ -82,11 +82,16 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
 
   llvm::SmallVector<int64_t> operandAPosIterRed = getIteratorPos(
       linalgOp, mapOperandA, mlir::utils::IteratorType::reduction);
-  if (operandAPosIterRed.size() != 3 && operandAPosIterRed.size() != 2)
+  unsigned numRedItersA = operandAPosIterRed.size();
+  if (numRedItersA != 3 && numRedItersA != 2)
     return std::make_pair(false, hasBatch);
 
+  // Check if there is an extra outer batch reduce K-dim.
+  // For VNNI format:
+  //  - one inner K-dim is the GEMM reduction
+  //  - one inner K-dim is the VNNI blocking factor
   int64_t batchRedIter = std::numeric_limits<int64_t>::max();
-  if (operandAPosIterRed.size() == 3) {
+  if (numRedItersA == 3) {
     batchRedIter = operandAPosIterRed[0];
     hasBatch = true;
   }
@@ -108,8 +113,10 @@ std::pair<bool, bool> isBrgemmVnniOp(linalg::GenericOp linalgOp,
     return std::make_pair(false, hasBatch);
   }
 
-  bool isBrgemmVnni = vnni::utils::isInVnniLayout(linalgOp, *blockingFactor);
-  return std::make_pair(isBrgemmVnni, hasBatch);
+  // At this point, the operation is a valid matmul contraction.
+  // Finally, ensure that it is in VNNI layout.
+  bool isVnniMatmul = vnni::utils::isInVnniLayout(linalgOp, *blockingFactor);
+  return std::make_pair(isVnniMatmul, hasBatch);
 }
 
 // Return true if all the operand have the same type, i.e., no implicit
