@@ -56,8 +56,8 @@ std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
           .operation(NumOfLoops(_OR(EqualsTo(5), EqualsTo(4))))
           .input(MatchAll(), HasStaticShape())
           .output(MatchAll(), HasStaticShape())
-          .input(MatchOne(0), HasMap(Any(), &mapOperandA))
-          .input(MatchOne(1), HasMap(Any(), &mapOperandB))
+          .input(MatchOne(0), HasMap(ProjectedPermutation(), &mapOperandA))
+          .input(MatchOne(1), HasMap(ProjectedPermutation(), &mapOperandB))
           .output(MatchOne(0), HasMap(BroadcastableProjectedPermutation(), &mapOperandC))
           .region(MatchOne(0),
                   WithOpChain<arith::MulFOp, arith::AddFOp>(operands));
