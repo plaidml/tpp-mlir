@@ -282,15 +282,17 @@ func.func @simple_brgemm(%arg0: memref<2x32x32xf32>, %arg1: memref<2x32x32xf32>,
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4, d1)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3, d1)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
 
 func.func @vnni_brgemm_interchanged(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf16>, %arg2: memref<32x32xbf16>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [16, 32, 16, 2]
+    : memref<16x32x32xbf16> into memref<16x32x16x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<16x32x32xbf16>, memref<16x16x32x2xbf16>)
+    ins(%expanded, %arg1 : memref<16x32x16x2xbf16>, memref<16x16x32x2xbf16>)
     outs(%arg2 : memref<32x32xbf16>) {
       ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
         %5 = arith.mulf %in, %in_5 : bf16
@@ -310,15 +312,17 @@ func.func @vnni_brgemm_interchanged(%arg0: memref<16x32x32xbf16>, %arg1: memref<
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 func.func @vnni_brgemm(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf16>, %arg2: memref<32x32xbf16>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [16, 32, 16, 2]
+    : memref<16x32x32xbf16> into memref<16x32x16x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%arg0, %arg1 : memref<16x32x32xbf16>, memref<16x16x32x2xbf16>)
+    ins(%expanded, %arg1 : memref<16x32x16x2xbf16>, memref<16x16x32x2xbf16>)
     outs(%arg2 : memref<32x32xbf16>) {
       ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
         %5 = arith.mulf %in, %in_5 : bf16
@@ -338,17 +342,19 @@ func.func @vnni_brgemm(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 func.func @vnni_brgemm_strided(%arg0: memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>,
                                %arg1: memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>,
                                %arg2: memref<8x8xbf16>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [8, 8, 4, 2]
+    : memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>> into memref<8x8x4x2xbf16, strided<[64, 8, 2, 1], offset: ?>>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%arg0, %arg1 : memref<8x8x8xbf16, strided<[64, 8, 1], offset: ?>>, memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>)
+    ins(%expanded, %arg1 : memref<8x8x4x2xbf16, strided<[64, 8, 2, 1], offset: ?>>, memref<8x4x8x2xbf16, strided<[64, 16, 2, 1], offset: ?>>)
     outs(%arg2 : memref<8x8xbf16>) {
       ^bb0(%in: bf16, %in_9: bf16, %out: bf16):
         %11 = arith.mulf %in, %in_9 : bf16
@@ -369,15 +375,17 @@ func.func @vnni_brgemm_strided(%arg0: memref<8x8x8xbf16, strided<[64, 8, 1], off
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4, d1)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3, d1)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d3, d2)>
 
 func.func @vnni_brgemm_require_transpose_on_C(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf16>, %arg2: memref<32x32xbf16>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [16, 32, 16, 2]
+    : memref<16x32x32xbf16> into memref<16x32x16x2xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<16x32x32xbf16>, memref<16x16x32x2xbf16>)
+    ins(%expanded, %arg1 : memref<16x32x16x2xbf16>, memref<16x16x32x2xbf16>)
     outs(%arg2 : memref<32x32xbf16>) {
       ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
         %5 = arith.mulf %in, %in_5 : bf16
@@ -393,15 +401,17 @@ func.func @vnni_brgemm_require_transpose_on_C(%arg0: memref<16x32x32xbf16>, %arg
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 5, d3, d1)>
-#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d3, d2)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4, d1)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3, d1)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
 
-func.func @brgemm_not_vnni(%arg0: memref<16x32x32xbf16>, %arg1: memref<16x16x32x2xbf16>, %arg2: memref<32x32xbf16>) {
+func.func @brgemm_not_vnni(%arg0: memref<16x32x160xbf16>, %arg1: memref<16x32x32x5xbf16>, %arg2: memref<32x32xbf16>) {
+  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [16, 32, 32, 5]
+    : memref<16x32x160xbf16> into memref<16x32x32x5xbf16>
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<16x32x32xbf16>, memref<16x16x32x2xbf16>)
+    ins(%expanded, %arg1 : memref<16x32x32x5xbf16>, memref<16x32x32x5xbf16>)
     outs(%arg2 : memref<32x32xbf16>) {
       ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
         %5 = arith.mulf %in, %in_5 : bf16

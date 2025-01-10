@@ -1,7 +1,7 @@
 // RUN: tpp-opt %s -constant-fold-pack -canonicalize -split-input-file | FileCheck %s
 
-#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5 floordiv 2, d4, d6)>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5, d4, d6)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>
 
 func.func @chained_constant_packs(%arg0: tensor<64x64xbf16>) -> tensor<64x64xbf16> {
@@ -16,7 +16,12 @@ func.func @chained_constant_packs(%arg0: tensor<64x64xbf16>) -> tensor<64x64xbf1
   %3 = linalg.fill ins(%cst_1 : bf16) outs(%2 : tensor<2x2x32x32xbf16>) -> tensor<2x2x32x32xbf16>
   %4 = tensor.empty() : tensor<2x2x16x32x2xbf16>
   %pack_3 = tensor.pack %pack_2 inner_dims_pos = [2] inner_tiles = [2] into %4 : tensor<2x2x32x32xbf16> -> tensor<2x2x16x32x2xbf16>
-  %5 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]} ins(%pack, %pack_3 : tensor<2x2x32x32xbf16>, tensor<2x2x16x32x2xbf16>) outs(%3 : tensor<2x2x32x32xbf16>) {
+  %expanded = tensor.expand_shape %pack [[0], [1], [2], [3, 4]] output_shape [2, 2, 32, 16, 2]
+    : tensor<2x2x32x32xbf16> into tensor<2x2x32x16x2xbf16>
+  %5 = linalg.generic {indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%expanded, %pack_3 : tensor<2x2x32x16x2xbf16>, tensor<2x2x16x32x2xbf16>)
+    outs(%3 : tensor<2x2x32x32xbf16>) {
   ^bb0(%in: bf16, %in_6: bf16, %out: bf16):
     %12 = arith.mulf %in, %in_6 : bf16
     %13 = arith.addf %out, %12 : bf16
@@ -29,7 +34,12 @@ func.func @chained_constant_packs(%arg0: tensor<64x64xbf16>) -> tensor<64x64xbf1
   %9 = linalg.fill ins(%cst_1 : bf16) outs(%8 : tensor<2x2x32x32xbf16>) -> tensor<2x2x32x32xbf16>
   %10 = tensor.empty() : tensor<2x2x16x32x2xbf16>
   %pack_5 = tensor.pack %pack_4 inner_dims_pos = [2] inner_tiles = [2] into %10 : tensor<2x2x32x32xbf16> -> tensor<2x2x16x32x2xbf16>
-  %11 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]} ins(%5, %pack_5 : tensor<2x2x32x32xbf16>, tensor<2x2x16x32x2xbf16>) outs(%9 : tensor<2x2x32x32xbf16>) {
+  %expanded_1 = tensor.expand_shape %5 [[0], [1], [2], [3, 4]] output_shape [2, 2, 32, 16, 2]
+    : tensor<2x2x32x32xbf16> into tensor<2x2x32x16x2xbf16>
+  %11 = linalg.generic {indexing_maps = [#map, #map1, #map2],
+    iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]}
+    ins(%expanded_1, %pack_5 : tensor<2x2x32x16x2xbf16>, tensor<2x2x16x32x2xbf16>)
+    outs(%9 : tensor<2x2x32x32xbf16>) {
   ^bb0(%in: bf16, %in_6: bf16, %out: bf16):
     %12 = arith.mulf %in, %in_6 : bf16
     %13 = arith.addf %out, %12 : bf16

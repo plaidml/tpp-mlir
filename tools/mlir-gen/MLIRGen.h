@@ -94,6 +94,9 @@ class MLIRGenerator {
   /// VNNI packing factor (0, 2, 4)
   int vnniFactor;
 
+  /// Apply VNNI packing
+  bool vnniPacked;
+
   // ============================ Helpers
 
   /// Return current random seed, update next

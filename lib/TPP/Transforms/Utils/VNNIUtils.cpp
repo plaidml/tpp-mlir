@@ -8,6 +8,7 @@
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -37,37 +38,75 @@ bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
   return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
 }
 
-FailureOr<AffineDimExpr> isInVnniLayout(linalg::GenericOp linalgOp,
-                                        AffineMap map, int64_t blockingFactor) {
-  ArrayRef<AffineExpr> results = map.getResults();
+bool isInVnniLayout(linalg::LinalgOp linalgOp,
+                    std::optional<int64_t> blockingFactor) {
+  // Narrow down type operations - VNNI only applies to contractions.
+  if (!linalg::isaContractionOpInterface(linalgOp))
+    return false;
+
+  auto matA = linalgOp->getOperand(0);
+  auto matB = linalgOp->getOperand(1);
+  auto typeA = dyn_cast<ShapedType>(matA.getType());
+  auto typeB = dyn_cast<ShapedType>(matB.getType());
+  unsigned rankA = typeA.getRank();
+  unsigned rankB = typeB.getRank();
+  // VNNI format requires at least 1 parallel and 2 reduction dimensions.
+  if (rankA < 3 || rankB < 3)
+    return false;
+
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // At least two reduction dimensions are expected:
+  // one for the VNNI factor and one for the K dimension
+  if (dims->k.size() < 2)
+    return false;
+
+  // Validate affine maps - VNNI computation should be defined by the two
+  // innermost reduction iterators.
+  // The input matrix dimensions layout must match the following:
+  //   - matrix A - [...][K/vnniFactor][vnniFactor]
+  //   - matrix B - [...][K/vnniFactor][N][vnniFactor]
   SmallVector<mlir::utils::IteratorType> iteratorTypes =
       linalgOp.getIteratorTypesArray();
+  AffineMap mapA = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(0));
+  AffineMap mapB = linalgOp.getMatchingIndexingMap(&linalgOp->getOpOperand(1));
 
-  AffineExpr vnniDim = results.back();
-  auto dimExpr = dyn_cast<AffineDimExpr>(vnniDim);
-  if (!dimExpr || iteratorTypes[dimExpr.getPosition()] !=
-                      mlir::utils::IteratorType::reduction) {
-    return failure();
-  }
+  auto vnniDimA = dyn_cast<AffineDimExpr>(mapA.getResult(rankA - 1));
+  auto vnniDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 1));
+  if (!vnniDimA || !vnniDimB || vnniDimA != vnniDimB ||
+      iteratorTypes[vnniDimA.getPosition()] !=
+          mlir::utils::IteratorType::reduction)
+    return false;
+  auto redDimA = dyn_cast<AffineDimExpr>(mapA.getResult(rankA - 2));
+  auto redDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 3));
+  if (!redDimA || !redDimB || redDimA != redDimB ||
+      iteratorTypes[redDimA.getPosition()] !=
+          mlir::utils::IteratorType::reduction)
+    return false;
+  auto parallelDimB = dyn_cast<AffineDimExpr>(mapB.getResult(rankB - 2));
+  if (!parallelDimB || iteratorTypes[parallelDimB.getPosition()] !=
+                           mlir::utils::IteratorType::parallel)
+    return false;
 
-  for (auto result : results) {
-    auto blockeDim = dyn_cast<AffineBinaryOpExpr>(result);
-    if (!blockeDim)
-      continue;
-    if (blockeDim.getKind() != AffineExprKind::FloorDiv)
-      continue;
-    auto lhsDim = dyn_cast<AffineDimExpr>(blockeDim.getLHS());
-    auto rhsCst = dyn_cast<AffineConstantExpr>(blockeDim.getRHS());
-    if (!lhsDim || !rhsCst)
-      continue;
-    if (iteratorTypes[lhsDim.getPosition()] !=
-        mlir::utils::IteratorType::reduction)
-      continue;
-    if (rhsCst.getValue() != blockingFactor)
-      continue;
-    return lhsDim;
-  }
-  return failure();
+  // VNNI factor must be:
+  //   - the innermost inputs' dimension
+  //   - statically known
+  //   - multiple of 2 or equal to the specified factor
+  auto vnniDimSize = typeB.getShape().back();
+  if (!(vnniDimSize != ShapedType::kDynamic &&
+        typeA.getShape().back() == vnniDimSize &&
+        (blockingFactor ? vnniDimSize == *blockingFactor
+                        : vnniDimSize % 2 == 0)))
+    return false;
+
+  // The split reduction dimension size should also match.
+  if (typeA.getShape().end()[-2] != typeB.getShape().end()[-3])
+    return false;
+
+  return true;
 }
 
 bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {

@@ -125,6 +125,9 @@ MLIRGenerator::MLIRGenerator(StringRef outputOpKindStr, StringRef kernelStr,
   assert(((vnniFactor >= 0) && (vnniFactor % 2 == 0)) &&
          "Invalid VNNI packing factor");
 
+  // Use VNNI packed format if both tiles and VNNI factor are specified.
+  vnniPacked = tiles.size() > 0 && vnniFactor != 0;
+
   // Initialize random seed, if needed
   if (seed) {
     initType = TensorInitType::Normal;
@@ -375,8 +378,33 @@ Value MLIRGenerator::lowerNamedMatmul(Value input, Value weight, Value output) {
 
 Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
   Value chain;
-  auto inputShape = cast<ShapedType>(input.getType());
-  auto outputShape = cast<ShapedType>(output.getType());
+  auto inputType = cast<ShapedType>(input.getType());
+  auto outputType = cast<ShapedType>(output.getType());
+
+  if (vnniPacked) {
+    SmallVector<int64_t> vnniShape{inputType.getShape()};
+    vnniShape.back() = vnniShape.back() / vnniFactor;
+    vnniShape.push_back(vnniFactor);
+
+    auto weightShape = cast<ShapedType>(weight.getType()).getShape();
+    assert(weightShape.size() >= 3 && "Expected VNNI weights");
+    assert(vnniShape.back() == weightShape.back() &&
+           vnniShape.end()[-2] == weightShape.end()[-3] &&
+           "Input and weights VNNI layout mismatch");
+
+    auto vnniType =
+        RankedTensorType::get(vnniShape, inputType.getElementType());
+
+    auto inputRank = inputType.getRank();
+    SmallVector<ReassociationIndices> reassociationIndices;
+    for (int64_t index = 0; index < inputRank - 1; index++)
+      reassociationIndices.push_back({index});
+    reassociationIndices.push_back({inputRank - 1, inputRank});
+
+    input = builder.create<tensor::ExpandShapeOp>(loc, vnniType, input,
+                                                  reassociationIndices);
+  }
+
   if (outputOpKind == OutputOpKind::Generic ||
       (outputOpKind == OutputOpKind::NamedOp && keepGenericMatmul)) {
     chain = lowerGenericMatmul(input, weight, output);
@@ -384,7 +412,7 @@ Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
     chain = lowerNamedMatmul(input, weight, output);
   }
 
-  computeMatmulFlops(inputShape, outputShape);
+  computeMatmulFlops(inputType, outputType);
   return chain;
 }
 
@@ -656,7 +684,6 @@ AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
   auto n = cast<ShapedType>(tensor.getType()).getRank();
   // Packed tensors are either 4 or 5 dim, map needs to be 6 or 7
   bool packed = (n > 2);
-  bool vnniPacked = packed && vnniFactor != 0;
   SmallVector<AffineExpr> list;
   auto zero = getAffineConstantExpr(0, builder.getContext());
   auto pushDim = [&](size_t index, ArrayRef<int64_t> order) {
@@ -704,7 +731,7 @@ AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
     if (vnniPacked) {
       // Extra VNNI packing reduction dim
       n += 1;
-      getDims({0, 2, 4, 6});
+      getDims({0, 2, 4, 6, 3});
     } else if (packed)
       getDims({0, 2, 3, 5});
     else
@@ -717,7 +744,6 @@ AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
       // Extra VNNI packing reduction dim
       n += 1;
       getDims({1, 2, 6, 5, 3});
-      list[2] = list[2].floorDiv(vnniFactor);
     } else if (packed)
       getDims({1, 2, 5, 4});
     else
@@ -743,7 +769,6 @@ AffineMap MLIRGenerator::getMap(Value tensor, MapType type) {
 
 SmallVector<utils::IteratorType> MLIRGenerator::getIterators(MapType type) {
   bool packed = tiles.size();
-  bool vnniPacked = packed && vnniFactor != 0;
   switch (type) {
   case MAP_PARALLEL:
   case MAP_BROADCAST:

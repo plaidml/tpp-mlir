@@ -26,8 +26,8 @@ module {
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
-#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4 floordiv 2, d3, d1)>
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4, d1)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3, d1)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3)>
 module {
   memref.global "private" constant @__constant_4x1x4x2xbf16 : memref<4x1x4x2xbf16> = dense<1.000000e+00> {alignment = 64 : i64}
@@ -39,7 +39,12 @@ module {
       %subview = memref.subview %alloc[%arg1, %arg2, 0, 0] [1, 1, 8, 4] [1, 1, 1, 1] : memref<2x2x8x4xbf16> to memref<8x4xbf16, strided<[4, 1], offset: ?>>
       linalg.fill ins(%cst : bf16) outs(%subview : memref<8x4xbf16, strided<[4, 1], offset: ?>>)
       %subview_0 = memref.subview %arg0[%arg1, 0, 0, 0] [1, 4, 8, 2] [1, 1, 1, 1] : memref<2x4x8x2xbf16> to memref<4x8x2xbf16, strided<[16, 2, 1], offset: ?>>
-      linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%subview_0, %0 : memref<4x8x2xbf16, strided<[16, 2, 1], offset: ?>>, memref<4x1x4x2xbf16>) outs(%subview : memref<8x4xbf16, strided<[4, 1], offset: ?>>) {
+      %expanded = memref.expand_shape %subview_0 [[0], [1], [2, 3]] output_shape [4, 8, 1, 2]
+        : memref<4x8x2xbf16, strided<[16, 2, 1], offset: ?>> into memref<4x8x1x2xbf16, strided<[16, 2, 2, 1], offset: ?>>
+      linalg.generic {indexing_maps = [#map, #map1, #map2],
+        iterator_types = ["reduction", "reduction", "parallel", "parallel", "reduction"]}
+        ins(%expanded, %0 : memref<4x8x1x2xbf16, strided<[16, 2, 2, 1], offset: ?>>, memref<4x1x4x2xbf16>)
+        outs(%subview : memref<8x4xbf16, strided<[4, 1], offset: ?>>) {
       ^bb0(%in: bf16, %in_1: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_1 : bf16
         %2 = arith.addf %out, %1 : bf16
@@ -83,16 +88,19 @@ module {
 
 // -----
 
-#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6)>
-#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6 floordiv 2, d5, d3)>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6, d3)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6, d5, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>
 module {
-  func.func @entry(%arg0: tensor<2x4x8x2xbf16>) -> tensor<2x2x8x4xbf16> {
+  func.func @entry(%arg0: tensor<2x4x8x1x2xbf16>) -> tensor<2x2x8x4xbf16> {
     %cst = arith.constant dense<1.000000e+00> : tensor<2x4x1x4x2xbf16>
     %cst_0 = arith.constant 0.000000e+00 : bf16
     %0 = tensor.empty() : tensor<2x2x8x4xbf16>
     %1 = linalg.fill ins(%cst_0 : bf16) outs(%0 : tensor<2x2x8x4xbf16>) -> tensor<2x2x8x4xbf16>
-    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]} ins(%arg0, %cst : tensor<2x4x8x2xbf16>, tensor<2x4x1x4x2xbf16>) outs(%1 : tensor<2x2x8x4xbf16>) {
+    %2 = linalg.generic {indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %cst : tensor<2x4x8x1x2xbf16>, tensor<2x4x1x4x2xbf16>)
+      outs(%1 : tensor<2x2x8x4xbf16>) {
     ^bb0(%in: bf16, %in_1: bf16, %out: bf16):
       %3 = arith.mulf %in, %in_1 : bf16
       %4 = arith.addf %out, %3 : bf16
@@ -103,7 +111,7 @@ module {
 }
 
 
-// CHECK:   func.func @entry(%[[ARG0:.*]]: tensor<2x4x8x2xbf16>) -> tensor<2x2x8x4xbf16> {
+// CHECK:   func.func @entry(%[[ARG0:.*]]: tensor<2x4x8x1x2xbf16>) -> tensor<2x2x8x4xbf16> {
 // CHECK:       vector.transfer_write 
 // CHECK-NOT:       %[[vec1:.*]] = vector.transfer_read 
 // CHECK-NOT:       %[[vec2:.*]] = vector.transfer_read 

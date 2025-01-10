@@ -61,10 +61,11 @@ bool isTwoDFillOpWithZeros(linalg::LinalgOp linalgOp,
                            SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 // Return a pair where the first member is true if and only if the operation
-// represents a brgemm in VNNI layout. The second member tells if the brgemm has
-// the batch dimension; it has meaning only if the first field is valid.
+// represents a matmul (GEMM or BRGEMM) in VNNI layout. The second member tells
+// if the brgemm has the batch dimension; it has meaning only if the first field
+// is valid.
 std::pair<bool, bool>
-isBrgemmVnniOp(linalg::GenericOp linalgOp,
+isMatmulVnniOp(linalg::GenericOp linalgOp,
                SmallVectorImpl<Value> *capturedOperands = nullptr);
 
 } // namespace utils

@@ -19,8 +19,8 @@ func.func @blocked_matmul(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x
   return %0 : tensor<32x128x4x4xbf16>
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5)>
-// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5 floordiv 2, d4, d6)>
+// CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d3, d5, d6)>
+// CHECK: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d5, d4, d6)>
 // CHECK: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>
 // CHECK: func.func @blocked_matmul(
 // CHECK: %[[ARG0:.*]]: tensor<32x64x4x4xbf16>,
@@ -30,4 +30,3 @@ func.func @blocked_matmul(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x
 // CHECK:  linalg.generic
 // CHECK:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]
-

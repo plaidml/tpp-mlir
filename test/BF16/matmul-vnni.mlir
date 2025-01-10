@@ -12,8 +12,8 @@ func.func @matmul_static(
 }
 
 // CHECK: #[[MAP:.+]] = affine_map<(d0) -> (d0 * 32)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3 floordiv 2, d2, d4)>
+// CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+// CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2, d4)>
 // CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2)>
 
 // CHECK-LABEL: matmul_static
@@ -24,14 +24,16 @@ func.func @matmul_static(
 // CHECK: %[[EMPTY_1:.+]] = tensor.empty() : tensor<32x16x32x32xbf16>
 // CHECK: %[[PACK_0:.+]] = tensor.pack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 32]
 // CHECK-SAME:  into %{{.+}} : tensor<512x1024xbf16> -> tensor<32x16x32x32xbf16>
+// CHECK: %[[VNNI_A:.+]] = tensor.expand_shape %[[PACK]] {{\[}}[0], [1], [2], [3, 4]]
+// CHECK-SAME: output_shape [8, 16, 32, 16, 2] : tensor<8x16x32x32xbf16> into tensor<8x16x32x16x2xbf16>
 // CHECK: %[[EMPTY_2:.+]] = tensor.empty() : tensor<32x16x16x32x2xbf16>
 // CHECK: %[[PACK_1:.+]] = tensor.pack %[[PACK_0]] inner_dims_pos = [2] inner_tiles = [2] into %[[EMPTY_2]]
 // CHECK-SAME:  : tensor<32x16x32x32xbf16> -> tensor<32x16x16x32x2xbf16>
 // CHECK: %{{.+}} = scf.forall (%[[ARG3:.+]], %[[ARG4:.+]]) in (8, 32) shared_outs(%[[ARG5:.+]] = %[[ARG2]])
 // CHECK: %[[APPLY:.+]] = affine.apply #[[MAP]](%[[ARG3]])
 // CHECK: %[[APPLY_1:.+]] = affine.apply #[[MAP]](%[[ARG4]])
-// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[PACK]][%[[ARG3]], 0, 0, 0] [1, 16, 32, 32] [1, 1, 1, 1]
-// CHECK-SAME:  : tensor<8x16x32x32xbf16> to tensor<16x32x32xbf16>
+// CHECK: %[[SLICE:.+]] = tensor.extract_slice %[[VNNI_A]][%[[ARG3]], 0, 0, 0, 0] [1, 16, 32, 16, 2] [1, 1, 1, 1, 1]
+// CHECK-SAME:  : tensor<8x16x32x16x2xbf16> to tensor<16x32x16x2xbf16>
 // CHECK: %[[SLICE_2:.+]] = tensor.extract_slice %[[PACK_1]][%[[ARG4]], 0, 0, 0, 0] [1, 16, 16, 32, 2] [1, 1, 1, 1, 1]
 // CHECK-SAME:  : tensor<32x16x16x32x2xbf16> to tensor<16x16x32x2xbf16>
 // CHECK: %[[SLICE_3:.+]] = tensor.extract_slice %[[ARG5]][%[[APPLY]], %[[APPLY_1]]] [32, 32] [1, 1]

@@ -2,8 +2,8 @@
 // RUN: tpp-run %s  \
 // RUN:  -e entry -entry-point-result=void
 
-#map = affine_map<(d0, d1, d2, d3) -> (d1, d3)>
-#map1 = affine_map<(d0, d1, d2, d3) -> (d3 floordiv 2, d2, d0)>
+#map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 #map3 = affine_map<(d0, d1) -> (d0, d1)>
 #map4 = affine_map<(d0, d1) -> (d1)>
@@ -11,8 +11,8 @@
 func.func @entry(){
   %c0 = arith.constant 0.0 : bf16
   %c1 = arith.constant 1.0 : bf16
-  %arg0 = memref.alloc() : memref<128x256xbf16>
-  linalg.fill ins(%c1 : bf16) outs(%arg0 : memref<128x256xbf16>)
+  %arg0 = memref.alloc() : memref<128x128x2xbf16>
+  linalg.fill ins(%c1 : bf16) outs(%arg0 : memref<128x128x2xbf16>)
   %arg2 = memref.alloc() : memref<512xbf16>
   linalg.fill ins(%c1 : bf16) outs(%arg2 : memref<512xbf16>)
   %arg3 = memref.alloc() : memref<128x512xbf16>
@@ -31,7 +31,7 @@ func.func @entry(){
   linalg.generic {
     indexing_maps = [#map, #map1, #map2],
     iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %wt : memref<128x256xbf16>, memref<128x512x2xbf16>)
+    ins(%arg0, %wt : memref<128x128x2xbf16>, memref<128x512x2xbf16>)
     outs(%arg3 : memref<128x512xbf16>) {
       ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
         %1 = arith.mulf %in, %in_2 : bf16
