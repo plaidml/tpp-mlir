@@ -385,6 +385,13 @@ Value MLIRGenerator::lowerMatmul(Value input, Value weight, Value output) {
     SmallVector<int64_t> vnniShape{inputType.getShape()};
     vnniShape.back() = vnniShape.back() / vnniFactor;
     vnniShape.push_back(vnniFactor);
+
+    auto weightShape = cast<ShapedType>(weight.getType()).getShape();
+    assert(weightShape.size() >= 3 && "Expected VNNI weights");
+    assert(vnniShape.back() == weightShape.back() &&
+           vnniShape.end()[-2] == weightShape.end()[-3] &&
+           "Input and weights VNNI layout mismatch");
+
     auto vnniType =
         RankedTensorType::get(vnniShape, inputType.getElementType());
 
