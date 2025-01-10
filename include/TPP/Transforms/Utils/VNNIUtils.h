@@ -20,6 +20,7 @@ class OpOperand;
 class AffineDimExpr;
 class AffineMap;
 class VectorType;
+class Operation;
 
 namespace linalg {
 class LinalgOp;
@@ -35,8 +36,10 @@ enum class VnniOperandRank {
   BRGEMM_OUTS = 3
 };
 
-// Return the VNNI blocking factor: 2 for BF16 and 4 for BF8.
-std::optional<int64_t> getVnniBlockingFactor(Type type);
+// Return the VNNI blocking factor.
+// Optionally, operation can be provided to give access to DLTI.
+std::optional<int64_t> getVnniBlockingFactor(Type type,
+                                             Operation *op = nullptr);
 
 // Return true if the memref is in VNNI layout with rank `expectedRank`.
 bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref);

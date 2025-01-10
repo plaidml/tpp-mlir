@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
+
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -20,10 +21,38 @@ namespace mlir {
 namespace vnni {
 namespace utils {
 
-std::optional<int64_t> getVnniBlockingFactor(Type type) {
+std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
   auto elementType = getElementTypeOrSelf(type);
-  if (elementType.isBF16())
+  if (elementType.isBF16()) {
+    // Check if a VNNI factor hint is associated to the IR via DLTI.
+    auto deriveVnniFromDLTI = [&]() -> std::optional<int64_t> {
+      if (!op)
+        return std::nullopt;
+      ModuleOp moduleOp = op->getParentOfType<mlir::ModuleOp>();
+      if (!moduleOp)
+        return std::nullopt;
+      TargetSystemSpecInterface sysSpec = moduleOp.getTargetSystemSpec();
+      if (!sysSpec)
+        return std::nullopt;
+      auto deviceId = StringAttr::get(moduleOp->getContext(), "CPU");
+      auto deviceSpec = sysSpec.getDeviceSpecForDeviceID(deviceId);
+      if (!deviceSpec)
+        return std::nullopt;
+      auto tileSizeId = StringAttr::get(moduleOp->getContext(), "vnni");
+      DataLayoutEntryInterface entry =
+          (*deviceSpec).getSpecForIdentifier(tileSizeId);
+      if (!entry)
+        return std::nullopt;
+      Attribute value = entry.getValue();
+      if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value))
+        return intAttr.getInt();
+      return std::nullopt;
+    };
+    if (auto vnniFactor = deriveVnniFromDLTI())
+      return *vnniFactor;
+
     return libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
+  }
   return std::nullopt;
 }
 
