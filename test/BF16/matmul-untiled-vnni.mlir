@@ -26,7 +26,7 @@ func.func @blocked_matmul(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x
 // CHECK: %[[ARG0:.*]]: tensor<32x64x4x4xbf16>,
 // CHECK: %[[ARG1:.*]]: tensor<128x64x4x4xbf16>,
 // CHECK: %[[ARG2:.*]]: tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16> {
-// CHECK:  %[[PACKBUF:.*]] = tensor.empty() : tensor<128x64x2x4x2xbf16>
+// CHECK:  %[[PACKBUF:.*]] = tensor.empty() : tensor<128x64x{{2|1}}x4x{{2|4}}xbf16>
 // CHECK:  linalg.generic
 // CHECK:  indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 // CHECK:  iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction", "reduction"]

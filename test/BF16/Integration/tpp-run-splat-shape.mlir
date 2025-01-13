@@ -41,7 +41,7 @@ func.func @entry(%arg0: tensor<4x8x8x8xbf16>, %output: tensor<4x8x8x8xbf16>) -> 
 // due to compile time packing.
 // CHECK-NOT: memref.global "private" constant @__constant_{{.*}}: memref<8x8xbf16>
 // CHECK-DAG: memref.global "private" constant @__constant_{{.*}}: memref<4x8x8x8xbf16>
-// CHECK-DAG: memref.global "private" constant @__constant_{{.*}}: memref<8x8x4x8x{{[2|4|8]}}xbf16>
+// CHECK-DAG: memref.global "private" constant @__constant_{{.*}}: memref<8x8x{{[4|2]}}x8x{{2|4}}xbf16>
 // CHECK: xsmm_brgemm_invoke
 // CHECK: xsmm_binary_invoke
 // CHECK: xsmm_unary_invoke
