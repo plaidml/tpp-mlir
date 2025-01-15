@@ -355,21 +355,26 @@ module attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Not VNNI layout. The VNNI is not innermost in the access pattern for B.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
-    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<2x64x32xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+      : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<2x64x32xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expect_not_to_match_vnni_gemm
