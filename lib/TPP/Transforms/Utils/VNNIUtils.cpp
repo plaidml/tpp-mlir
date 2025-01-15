@@ -59,12 +59,16 @@ std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
 // Until we have a better way to express the VNNI layout (see: #563), it is up
 // to the callee to specify the expected rank in the VNNI layout as the rank
 // depends on the operations we are dealing with.
-bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
+bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref,
+                    std::optional<int64_t> blockingFactor) {
   if (memref.getRank() != static_cast<int64_t>(expectedRank) ||
-      !memref.getElementType().isBF16()) {
+      !memref.getElementType().isBF16())
     return false;
-  }
-  return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
+
+  if (blockingFactor && memref.getShape().back() != *blockingFactor)
+    return false;
+
+  return true;
 }
 
 bool isInVnniLayout(linalg::LinalgOp linalgOp,
@@ -138,15 +142,21 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   return true;
 }
 
-bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
-  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector);
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector,
+                    std::optional<int64_t> blockingFactor) {
+  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector,
+                        blockingFactor);
 }
 
-bool isInVnniLayout(int64_t expectedRank, VectorType vector) {
-  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16()) {
+bool isInVnniLayout(int64_t expectedRank, VectorType vector,
+                    std::optional<int64_t> blockingFactor) {
+  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16())
     return false;
-  }
-  return vector.getShape().back() == vnni::utils::getVnniBlockingFactor(vector);
+
+  if (blockingFactor && vector.getShape().back() != *blockingFactor)
+    return false;
+
+  return true;
 }
 
 } // namespace utils

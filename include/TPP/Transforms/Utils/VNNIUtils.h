@@ -42,12 +42,19 @@ std::optional<int64_t> getVnniBlockingFactor(Type type,
                                              Operation *op = nullptr);
 
 // Return true if the memref is in VNNI layout with rank `expectedRank`.
-bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref);
+// Optionally, the check can be constrained to a specific VNNI blocking factor.
+bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref,
+                    std::optional<int64_t> blockingFactor = std::nullopt);
 
 // Return true if the vector is in VNNI layout with rank `expectedRank`.
-bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector);
+// Optionally, the check can be constrained to a specific VNNI blocking factor.
+bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector,
+                    std::optional<int64_t> blockingFactor = std::nullopt);
 
-bool isInVnniLayout(int64_t expectedRank, VectorType vector);
+// Return true if the vector is in VNNI layout with rank `expectedRank`.
+// Optionally, the check can be constrained to a specific VNNI blocking factor.
+bool isInVnniLayout(int64_t expectedRank, VectorType vector,
+                    std::optional<int64_t> blockingFactor = std::nullopt);
 
 // Return true if the operation is in VNNI layout.
 // Optionally, the check can be constrained to a specific VNNI blocking factor.

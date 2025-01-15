@@ -455,10 +455,13 @@ LogicalResult GemmOp::verify() {
     auto memref = dyn_cast<MemRefType>(memrefOperands[idx].getType());
     assert(memref && (memref.getRank() == 2 || memref.getRank() == 3));
 
-    if (memref.getRank() == 3 &&
-        !vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::GEMM,
-                                     memref)) {
-      return emitOpError() << "expect VNNI layout for operand: " << actualIdx;
+    if (memref.getRank() == 3) {
+      auto vnniFactor = vnni::utils::getVnniBlockingFactor(memref);
+      if (!vnniFactor || (*vnniFactor) % 2 != 0 ||
+          !vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::GEMM,
+                                       memref)) {
+        return emitOpError() << "expect VNNI layout for operand: " << actualIdx;
+      }
     }
   }
   return success();
