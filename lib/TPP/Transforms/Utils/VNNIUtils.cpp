@@ -38,9 +38,9 @@ std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
       auto deviceSpec = sysSpec.getDeviceSpecForDeviceID(deviceId);
       if (!deviceSpec)
         return std::nullopt;
-      auto tileSizeId = StringAttr::get(moduleOp->getContext(), "vnni");
+      auto vnniId = StringAttr::get(moduleOp->getContext(), "vnni");
       DataLayoutEntryInterface entry =
-          (*deviceSpec).getSpecForIdentifier(tileSizeId);
+          (*deviceSpec).getSpecForIdentifier(vnniId);
       if (!entry)
         return std::nullopt;
       Attribute value = entry.getValue();
