@@ -1,6 +1,6 @@
 // RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.1
 // RUN: tpp-opt %s  --vector-contract-to-fma  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2
+// RUN: diff -q %t.1 %t.2
 // RUN: rm %t.1 %t.2
 
 // DIFF-NOT: {{.}}
