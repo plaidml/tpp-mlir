@@ -414,7 +414,8 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(brgemmOp,
                                        "unsupported blocking factor for type");
   }
-  SmallVector<OpFoldResult> tilesOnK = {rewriter.getI64IntegerAttr(2)};
+  SmallVector<OpFoldResult> tilesOnK = {
+      rewriter.getI64IntegerAttr(*blockingFactor)};
 
   Location loc = brgemmOp.getLoc();
   // Reshape input A.
