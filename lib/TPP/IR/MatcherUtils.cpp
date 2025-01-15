@@ -115,7 +115,7 @@ std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
 
   // At this point, the operation is a valid matmul contraction.
   // Finally, ensure that it is in VNNI layout.
-  bool isVnniMatmul = vnni::utils::isInVnniLayout(linalgOp, *blockingFactor);
+  bool isVnniMatmul = vnni::utils::isInVnniLayout(linalgOp);
   return std::make_pair(isVnniMatmul, hasBatch);
 }
 

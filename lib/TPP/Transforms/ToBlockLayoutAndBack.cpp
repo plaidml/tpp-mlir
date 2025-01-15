@@ -339,7 +339,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
                                        "unsupported blocking factor for type");
   }
 
-  if (vnni::utils::isInVnniLayout(matmulOp, *blockingFactor)) {
+  if (vnni::utils::isInVnniLayout(matmulOp)) {
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
   }
 
