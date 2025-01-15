@@ -1068,8 +1068,9 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
     if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
       return failure();
     // Ajust ldo based on the VNNI factor.
-    unaryInfo.ldo = stridesOnOutput->front() /
-                    *vnni::utils::getVnniBlockingFactor(out.getType());
+    unaryInfo.ldo =
+        stridesOnOutput->front() /
+        *vnni::utils::getVnniBlockingFactor(out.getType(), transposeOp);
     auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
     xsmm::UnaryKindAttr kind =
@@ -1112,7 +1113,7 @@ struct ConvertGenericToVnniMatmulLikeOp
     // Take the whole reduction dim size. Account for the VNNI factor (ensured
     // by the earlier check) that splits the K dim in the shape.
     std::optional<int64_t> vnniFactor =
-        vnni::utils::getVnniBlockingFactor(bufferB.getType());
+        vnni::utils::getVnniBlockingFactor(bufferB.getType(), genericOp);
     if (!vnniFactor)
       return rewriter.notifyMatchFailure(genericOp,
                                          "failed to determine VNNI factor");

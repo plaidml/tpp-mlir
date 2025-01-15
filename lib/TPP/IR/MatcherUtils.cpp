@@ -40,8 +40,8 @@ getIteratorPos(linalg::LinalgOp linalgOp, AffineMap indexingMap,
 std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
                                      SmallVectorImpl<Value> *operands) {
   bool hasBatch = false;
-  auto blockingFactor =
-      vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
+  auto blockingFactor = vnni::utils::getVnniBlockingFactor(
+      linalgOp->getOperands()[0].getType(), linalgOp);
   if (!blockingFactor)
     return std::make_pair(false, hasBatch);
 

@@ -333,7 +333,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 
   OpOperand &operandB = matmulOp->getOpOperand(1);
   auto blockingFactor =
-      vnni::utils::getVnniBlockingFactor(operandB.get().getType());
+      vnni::utils::getVnniBlockingFactor(operandB.get().getType(), matmulOp);
   if (!blockingFactor) {
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
@@ -409,7 +409,8 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
 
   Value operandB = brgemmOp.getInputs()[1];
   // Blocking factor on the `k` dimension.
-  auto blockingFactor = vnni::utils::getVnniBlockingFactor(operandB.getType());
+  auto blockingFactor =
+      vnni::utils::getVnniBlockingFactor(operandB.getType(), brgemmOp);
   if (!blockingFactor) {
     return rewriter.notifyMatchFailure(brgemmOp,
                                        "unsupported blocking factor for type");
