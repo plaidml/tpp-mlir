@@ -22,8 +22,8 @@ namespace mlir {
 namespace vnni {
 namespace utils {
 
-std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
-  int64_t blockingFactor = 0;
+unsigned getVnniBlockingFactor(Type type, Operation *op) {
+  unsigned blockingFactor = 0;
 
   auto elementType = getElementTypeOrSelf(type);
   if (elementType.isBF16()) {
@@ -37,14 +37,14 @@ std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
     }
   }
 
-  if (blockingFactor != 0 && blockingFactor % 2 == 0)
-    return blockingFactor;
+  // Ensure that the factor is divisible by two.
+  if (blockingFactor % 2 != 0)
+    return 0;
 
-  return std::nullopt;
+  return blockingFactor;
 }
 
-bool isInVnniLayout(linalg::LinalgOp linalgOp,
-                    std::optional<int64_t> blockingFactor) {
+bool isInVnniLayout(linalg::LinalgOp linalgOp, unsigned blockingFactor) {
   // Narrow down type operations - VNNI only applies to contractions.
   if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
@@ -101,10 +101,12 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   //   - statically known
   //   - multiple of 2 or equal to the specified factor
   auto vnniDimSize = typeB.getShape().back();
-  if (!(vnniDimSize != ShapedType::kDynamic &&
-        typeA.getShape().back() == vnniDimSize &&
-        (blockingFactor ? vnniDimSize == *blockingFactor
-                        : vnniDimSize % 2 == 0)))
+  if (vnniDimSize == ShapedType::kDynamic || vnniDimSize == 0 ||
+      vnniDimSize % 2 != 0)
+    return false;
+  if (typeA.getShape().back() != vnniDimSize)
+    return false;
+  if (blockingFactor && vnniDimSize != blockingFactor)
     return false;
 
   // The split reduction dimension size should also match.
@@ -115,20 +117,20 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
 }
 
 bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
-                    std::optional<int64_t> blockingFactor) {
+                    unsigned blockingFactor) {
   return isInVnniLayout(static_cast<int64_t>(expectedRank), shape,
                         blockingFactor);
 }
 
 bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
-                    std::optional<int64_t> blockingFactor) {
+                    unsigned blockingFactor) {
   if (shape.getRank() != expectedRank || !shape.getElementType().isBF16())
     return false;
 
-  if (shape.getShape().back() % 2 != 0)
+  auto vnniDim = shape.getShape().back();
+  if (vnniDim == 0 || vnniDim % 2 != 0)
     return false;
-
-  if (blockingFactor && shape.getShape().back() != *blockingFactor)
+  if (blockingFactor && vnniDim != blockingFactor)
     return false;
 
   return true;

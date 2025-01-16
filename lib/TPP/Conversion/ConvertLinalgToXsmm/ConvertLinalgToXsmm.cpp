@@ -1068,9 +1068,10 @@ struct ConvertVnniPacking : public OpRewritePattern<linalg::TransposeOp> {
     if (failed(stridesOnOutput) || stridesOnOutput->back() != 1)
       return failure();
     // Ajust ldo based on the VNNI factor.
-    unaryInfo.ldo =
-        stridesOnOutput->front() /
-        *vnni::utils::getVnniBlockingFactor(out.getType(), transposeOp);
+    auto vnniFactor =
+        vnni::utils::getVnniBlockingFactor(out.getType(), transposeOp);
+    assert(vnniFactor && "Failed to get VNNI blocking factor");
+    unaryInfo.ldo = stridesOnOutput->front() / vnniFactor;
     auto flags = rewriter.getArrayAttr(xsmm::UnaryFlagsAttr::get(
         rewriter.getContext(), xsmm::UnaryFlags::NONE));
     xsmm::UnaryKindAttr kind =

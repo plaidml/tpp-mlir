@@ -345,7 +345,7 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 
   Location loc = matmulOp.getLoc();
   SmallVector<OpFoldResult> tilesOnSmallK = {
-      rewriter.getI64IntegerAttr(*blockingFactor)};
+      rewriter.getI64IntegerAttr(blockingFactor)};
   SmallVector<std::pair<Value, unsigned>> kOperands;
   matmulOp.mapIterationSpaceDimToAllOperandDims(dims->k.back(), kOperands);
   if (kOperands.size() != 2)
@@ -416,7 +416,7 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
                                        "unsupported blocking factor for type");
   }
   SmallVector<OpFoldResult> tilesOnK = {
-      rewriter.getI64IntegerAttr(*blockingFactor)};
+      rewriter.getI64IntegerAttr(blockingFactor)};
 
   Location loc = brgemmOp.getLoc();
   // Reshape input A.
