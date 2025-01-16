@@ -23,16 +23,23 @@ namespace vnni {
 namespace utils {
 
 std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
+  int64_t blockingFactor = 0;
+
   auto elementType = getElementTypeOrSelf(type);
   if (elementType.isBF16()) {
     // Check if a VNNI factor hint is associated to the IR via DLTI.
     auto vnniValue = dlti::utils::query(op, {"CPU", "vnni"});
-    if (succeeded(vnniValue))
+    if (succeeded(vnniValue)) {
       if (auto intAttr = llvm::dyn_cast<IntegerAttr>(*vnniValue))
-        return intAttr.getInt();
-
-    return libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
+        blockingFactor = intAttr.getInt();
+    } else {
+      blockingFactor = libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
+    }
   }
+
+  if (blockingFactor != 0 && blockingFactor % 2 == 0)
+    return blockingFactor;
+
   return std::nullopt;
 }
 
