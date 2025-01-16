@@ -41,14 +41,19 @@ func.func @transpose_op_3d_f32(%arg0: memref<5x3x5xf32>, %arg1: memref<5x5x3xf32
 // CHECK-NOT: call @xsmm_unary_invoke
 
 // -----
-func.func @vnni_packing_2d_bf16(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
-    %cst = arith.constant 0.000000e+00 : bf16
-    %c0 = arith.constant 0 : index
-    %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xbf16, strided<[512, 1], offset: ?>> into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
-    %0 = vector.transfer_read %expand_shape[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>, vector<16x2x32xbf16>
-    %1 = vector.transpose %0, [0, 2, 1] : vector<16x2x32xbf16> to vector<16x32x2xbf16>
-    vector.transfer_write %1, %arg1[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x32x2xbf16>, memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-    return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @vnni_packing_2d_bf16(%arg0: memref<32x32xbf16, strided<[512, 1], offset: ?>>, %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
+      %cst = arith.constant 0.000000e+00 : bf16
+      %c0 = arith.constant 0 : index
+      %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xbf16, strided<[512, 1], offset: ?>> into memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>
+      %0 = vector.transfer_read %expand_shape[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<16x2x32xbf16, strided<[1024, 512, 1], offset: ?>>, vector<16x2x32xbf16>
+      %1 = vector.transpose %0, [0, 2, 1] : vector<16x2x32xbf16> to vector<16x32x2xbf16>
+      vector.transfer_write %1, %arg1[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x32x2xbf16>, memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+      return
+  }
 }
 
 // CHECK-LABEL: func.func @vnni_packing_2d_bf16(
@@ -87,20 +92,25 @@ func.func @not_vnni_packing_2d_f32(%arg0: memref<32x32xf32, strided<[512, 1], of
 
 // -----
 #map = affine_map<(d0) -> (d0 * 32)>
-func.func @vnni_packing_2d_bf16_forall(%arg0: memref<128x128xbf16>, %arg1: memref<4x4x16x32x2xbf16>) {
-    %cst = arith.constant 0.000000e+00 : bf16
-    %c0 = arith.constant 0 : index
-    scf.forall (%arg2, %arg3) in (4, 4) {
-      %0 = affine.apply #map(%arg3)
-      %1 = affine.apply #map(%arg2)
-      %subview = memref.subview %arg0[%0, %1] [32, 32] [1, 1] : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
-      %subview_0 = memref.subview %arg1[%arg2, %arg3, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-      %expand_shape = memref.expand_shape %subview [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xbf16, strided<[128, 1], offset: ?>> into memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>
-      %2 = vector.transfer_read %expand_shape[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>, vector<16x2x32xbf16>
-      %3 = vector.transpose %2, [0, 2, 1] : vector<16x2x32xbf16> to vector<16x32x2xbf16>
-      vector.transfer_write %3, %subview_0[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x32x2xbf16>, memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-    }
-    return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @vnni_packing_2d_bf16_forall(%arg0: memref<128x128xbf16>, %arg1: memref<4x4x16x32x2xbf16>) {
+      %cst = arith.constant 0.000000e+00 : bf16
+      %c0 = arith.constant 0 : index
+      scf.forall (%arg2, %arg3) in (4, 4) {
+        %0 = affine.apply #map(%arg3)
+        %1 = affine.apply #map(%arg2)
+        %subview = memref.subview %arg0[%0, %1] [32, 32] [1, 1] : memref<128x128xbf16> to memref<32x32xbf16, strided<[128, 1], offset: ?>>
+        %subview_0 = memref.subview %arg1[%arg2, %arg3, 0, 0, 0] [1, 1, 16, 32, 2] [1, 1, 1, 1, 1] : memref<4x4x16x32x2xbf16> to memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+        %expand_shape = memref.expand_shape %subview [[0, 1], [2]] output_shape [16, 2, 32] : memref<32x32xbf16, strided<[128, 1], offset: ?>> into memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>
+        %2 = vector.transfer_read %expand_shape[%c0, %c0, %c0], %cst {in_bounds = [true, true, true]} : memref<16x2x32xbf16, strided<[256, 128, 1], offset: ?>>, vector<16x2x32xbf16>
+        %3 = vector.transpose %2, [0, 2, 1] : vector<16x2x32xbf16> to vector<16x32x2xbf16>
+        vector.transfer_write %3, %subview_0[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x32x2xbf16>, memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+      }
+      return
+  }
 }
 
 // CHECK-LABEL: func.func @vnni_packing_2d_bf16_forall(
@@ -126,4 +136,3 @@ func.func @vnni_packing_2d_bf16_forall(%arg0: memref<128x128xbf16>, %arg1: memre
 // CHECK-NEXT: %[[indexCast2:.*]] = arith.index_cast %[[intptr0]]
 // CHECK-NEXT: %[[inttoptr2:.*]] = llvm.inttoptr %[[indexCast2]]
 // CHECK:   func.call @xsmm_unary_invoke(%[[c2_i64]], %[[dispatch]], %[[inttoptr]], %[[offset]], %[[inttoptr2]], %[[offset_1]])
-

@@ -220,30 +220,35 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 // CHECK-SAME:  %[[ARG0:.+]]: memref<64x4x4xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<64x2x4x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xbf16>
-func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
-                              %arg2: memref<4x4xbf16>) {
-  // CHECK: %[[C0:.*]] = arith.constant 0 : index
-  // CHECK: call @xsmm_brgemm_dispatch
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
+                                %arg2: memref<4x4xbf16>) {
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+    // CHECK: call @xsmm_brgemm_dispatch
 
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]] : memref<64x4x4xbf16> -> index
-  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]] : memref<64x4x4xbf16> -> index
+    // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]] : memref<64x2x4x2xbf16> -> index
-  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]] : memref<64x2x4x2xbf16> -> index
+    // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]] : memref<4x4xbf16> -> index
-  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]] : memref<4x4xbf16> -> index
+    // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  %c64_i64 = arith.constant 64 : i64
-  %0 = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4, 16, 16] flags = (vnni_b) data_type = bf16
-  xsmm.brgemm(data_type = bf16, %0, %arg0, %arg1, %arg2, %c64_i64)
-    : (i64, memref<64x4x4xbf16>, memref<64x2x4x2xbf16>, memref<4x4xbf16>, i64) -> ()
+    // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
+    %c64_i64 = arith.constant 64 : i64
+    %0 = xsmm.brgemm.dispatch [4, 4, 4, 4, 4, 4, 16, 16] flags = (vnni_b) data_type = bf16
+    xsmm.brgemm(data_type = bf16, %0, %arg0, %arg1, %arg2, %c64_i64)
+      : (i64, memref<64x4x4xbf16>, memref<64x2x4x2xbf16>, memref<4x4xbf16>, i64) -> ()
 
-  return
+    return
+  }
 }
 
 // -----
@@ -282,28 +287,33 @@ func.func @gemm(%A: memref<4x8xf32>,
 // CHECK-SAME:  %[[ARG0:.+]]: memref<6x10xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<5x6x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<6x6xbf16>
-func.func @gemm_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
-                            %arg2: memref<6x6xbf16>) {
-  // CHECK: %[[C0:.*]] = arith.constant 0 : index
-  // CHECK: call @xsmm_gemm_dispatch
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @gemm_bf16(%arg0: memref<6x10xbf16>, %arg1: memref<5x6x2xbf16>,
+                              %arg2: memref<6x6xbf16>) {
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+    // CHECK: call @xsmm_gemm_dispatch
 
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
-  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+    // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
-  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+    // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
-  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+    // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  %0 = xsmm.gemm.dispatch [6, 6, 10, 10, 6, 6] flags = (vnni_b) data_type = bf16
-  xsmm.gemm(data_type = bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
+    // CHECK: call @xsmm_gemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
+    %0 = xsmm.gemm.dispatch [6, 6, 10, 10, 6, 6] flags = (vnni_b) data_type = bf16
+    xsmm.gemm(data_type = bf16, %0, %arg0, %arg1, %arg2) : (i64, memref<6x10xbf16>, memref<5x6x2xbf16>, memref<6x6xbf16>) -> ()
 
-  return
+    return
+  }
 }
 
 // -----

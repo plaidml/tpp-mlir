@@ -3,13 +3,18 @@
 // RUN: tpp-opt --default-tpp-passes="vector-to-xsmm" %s  -mlir-print-ir-after=vectorization-pass  2>&1  | FileCheck %s --check-prefix=VECTOR
 // RUN: tpp-run --vector-to-XSMM %s -e entry -entry-point-result=void -print-mlir=mid  2>&1 | FileCheck %s --check-prefix=XSMM
 
-func.func @entry(%arg0 : tensor<4x4xbf16>, %arg1 : tensor<2x4x2xbf16>)-> tensor<2x4x2xbf16> {
-  %expand_shape = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape[2, 2, 4]
-    : tensor<4x4xbf16>
-    into tensor<2x2x4xbf16>
-  %retval = linalg.transpose ins(%expand_shape : tensor<2x2x4xbf16>)
-    outs(%arg1 : tensor<2x4x2xbf16>) permutation = [0, 2, 1]
-  return %retval: tensor<2x4x2xbf16>
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @entry(%arg0 : tensor<4x4xbf16>, %arg1 : tensor<2x4x2xbf16>)-> tensor<2x4x2xbf16> {
+    %expand_shape = tensor.expand_shape %arg0 [[0, 1], [2]] output_shape[2, 2, 4]
+      : tensor<4x4xbf16>
+      into tensor<2x2x4xbf16>
+    %retval = linalg.transpose ins(%expand_shape : tensor<2x2x4xbf16>)
+      outs(%arg1 : tensor<2x4x2xbf16>) permutation = [0, 2, 1]
+    return %retval: tensor<2x4x2xbf16>
+  }
 }
 
 // VECTOR: vector.transfer_read
