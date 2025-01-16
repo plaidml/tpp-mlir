@@ -125,6 +125,9 @@ bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
   if (shape.getRank() != expectedRank || !shape.getElementType().isBF16())
     return false;
 
+  if (shape.getShape().back() % 2 != 0)
+    return false;
+
   if (blockingFactor && shape.getShape().back() != *blockingFactor)
     return false;
 
