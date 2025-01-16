@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
+#include "TPP/Transforms/Utils/DLTIUtils.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -25,50 +26,14 @@ std::optional<int64_t> getVnniBlockingFactor(Type type, Operation *op) {
   auto elementType = getElementTypeOrSelf(type);
   if (elementType.isBF16()) {
     // Check if a VNNI factor hint is associated to the IR via DLTI.
-    auto deriveVnniFromDLTI = [&]() -> std::optional<int64_t> {
-      if (!op)
-        return std::nullopt;
-      ModuleOp moduleOp = op->getParentOfType<mlir::ModuleOp>();
-      if (!moduleOp)
-        return std::nullopt;
-      TargetSystemSpecInterface sysSpec = moduleOp.getTargetSystemSpec();
-      if (!sysSpec)
-        return std::nullopt;
-      auto deviceId = StringAttr::get(moduleOp->getContext(), "CPU");
-      auto deviceSpec = sysSpec.getDeviceSpecForDeviceID(deviceId);
-      if (!deviceSpec)
-        return std::nullopt;
-      auto vnniId = StringAttr::get(moduleOp->getContext(), "vnni");
-      DataLayoutEntryInterface entry =
-          (*deviceSpec).getSpecForIdentifier(vnniId);
-      if (!entry)
-        return std::nullopt;
-      Attribute value = entry.getValue();
-      if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value))
+    auto vnniValue = dlti::utils::query(op, {"CPU", "vnni"});
+    if (succeeded(vnniValue))
+      if (auto intAttr = llvm::dyn_cast<IntegerAttr>(*vnniValue))
         return intAttr.getInt();
-      return std::nullopt;
-    };
-    if (auto vnniFactor = deriveVnniFromDLTI())
-      return *vnniFactor;
 
     return libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
   }
   return std::nullopt;
-}
-
-// Until we have a better way to express the VNNI layout (see: #563), it is up
-// to the callee to specify the expected rank in the VNNI layout as the rank
-// depends on the operations we are dealing with.
-bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref,
-                    std::optional<int64_t> blockingFactor) {
-  if (memref.getRank() != static_cast<int64_t>(expectedRank) ||
-      !memref.getElementType().isBF16())
-    return false;
-
-  if (blockingFactor && memref.getShape().back() != *blockingFactor)
-    return false;
-
-  return true;
 }
 
 bool isInVnniLayout(linalg::LinalgOp linalgOp,
@@ -142,18 +107,18 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   return true;
 }
 
-bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector,
+bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
                     std::optional<int64_t> blockingFactor) {
-  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector,
+  return isInVnniLayout(static_cast<int64_t>(expectedRank), shape,
                         blockingFactor);
 }
 
-bool isInVnniLayout(int64_t expectedRank, VectorType vector,
+bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
                     std::optional<int64_t> blockingFactor) {
-  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16())
+  if (shape.getRank() != expectedRank || !shape.getElementType().isBF16())
     return false;
 
-  if (blockingFactor && vector.getShape().back() != *blockingFactor)
+  if (blockingFactor && shape.getShape().back() != *blockingFactor)
     return false;
 
   return true;
