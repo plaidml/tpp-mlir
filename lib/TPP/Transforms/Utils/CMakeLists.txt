@@ -1,5 +1,6 @@
 add_mlir_library(TPPTransformsUtils
   BuilderUtils.cpp
+  DLTIUtils.cpp
   TensorInit.cpp
   TensorInitFloat.cpp
   TensorInitInt.cpp

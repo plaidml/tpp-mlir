@@ -15,11 +15,12 @@
 
 namespace mlir {
 class Type;
-class MemRefType;
+class ShapedType;
 class OpOperand;
 class AffineDimExpr;
 class AffineMap;
 class VectorType;
+class Operation;
 
 namespace linalg {
 class LinalgOp;
@@ -35,21 +36,25 @@ enum class VnniOperandRank {
   BRGEMM_OUTS = 3
 };
 
-// Return the VNNI blocking factor: 2 for BF16 and 4 for BF8.
-std::optional<int64_t> getVnniBlockingFactor(Type type);
+// Return the VNNI blocking factor if it can be determined for the given type or
+// zero, otherwise.
+// Optionally, an operation can be provided to give access to DLTI.
+unsigned getVnniBlockingFactor(Type type, Operation *op = nullptr);
 
-// Return true if the memref is in VNNI layout with rank `expectedRank`.
-bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref);
+// Return true if the shaped type is in VNNI layout with rank `expectedRank`.
+// Optionally, the check can be constrained to a specific VNNI blocking factor.
+bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
-// Return true if the vector is in VNNI layout with rank `expectedRank`.
-bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector);
+// Return true if the shaped type is in VNNI layout with rank `expectedRank`.
+// Optionally, the check can be constrained to a specific VNNI blocking factor.
+bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
-bool isInVnniLayout(int64_t expectedRank, VectorType vector);
-
-// Return true if the operation is in VNNI layout.
+// Return true if the linalg operation is in VNNI layout.
 // Optionally, the check can be constrained to a specific VNNI blocking factor.
 bool isInVnniLayout(linalg::LinalgOp linalgOp,
-                    std::optional<int64_t> blockingFactor = std::nullopt);
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
 } // namespace utils
 } // namespace vnni

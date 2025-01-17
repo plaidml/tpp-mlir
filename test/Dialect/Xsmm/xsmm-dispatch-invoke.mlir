@@ -30,9 +30,14 @@ func.func @identity(%arg0: f32, %arg1: memref<1x1xf32>) {
 
 // -----
 
-func.func @gemm(%arg0: memref<3x6x2xbf16>, %arg1: memref<6x6xbf16>) {
-  %0 = xsmm.gemm.dispatch [6, 6, 6, 6, 6, 6] flags = (vnni_a) data_type = bf16
-  xsmm.gemm(data_type = bf16, %0, %arg0, %arg0, %arg1) :
-    (i64, memref<3x6x2xbf16>, memref<3x6x2xbf16>, memref<6x6xbf16>) -> ()
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @gemm(%arg0: memref<3x6x2xbf16>, %arg1: memref<6x6xbf16>) {
+    %0 = xsmm.gemm.dispatch [6, 6, 6, 6, 6, 6] flags = (vnni_a) data_type = bf16
+    xsmm.gemm(data_type = bf16, %0, %arg0, %arg0, %arg1) :
+      (i64, memref<3x6x2xbf16>, memref<3x6x2xbf16>, memref<6x6xbf16>) -> ()
+    return
+  }
 }

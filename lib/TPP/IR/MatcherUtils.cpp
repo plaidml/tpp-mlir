@@ -40,8 +40,8 @@ getIteratorPos(linalg::LinalgOp linalgOp, AffineMap indexingMap,
 std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
                                      SmallVectorImpl<Value> *operands) {
   bool hasBatch = false;
-  auto blockingFactor =
-      vnni::utils::getVnniBlockingFactor(linalgOp->getOperands()[0].getType());
+  auto blockingFactor = vnni::utils::getVnniBlockingFactor(
+      linalgOp->getOperands()[0].getType(), linalgOp);
   if (!blockingFactor)
     return std::make_pair(false, hasBatch);
 
@@ -115,7 +115,7 @@ std::pair<bool, bool> isMatmulVnniOp(linalg::GenericOp linalgOp,
 
   // At this point, the operation is a valid matmul contraction.
   // Finally, ensure that it is in VNNI layout.
-  bool isVnniMatmul = vnni::utils::isInVnniLayout(linalgOp, *blockingFactor);
+  bool isVnniMatmul = vnni::utils::isInVnniLayout(linalgOp);
   return std::make_pair(isVnniMatmul, hasBatch);
 }
 

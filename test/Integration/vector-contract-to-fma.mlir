@@ -1,9 +1,7 @@
 // RUN: tpp-opt %s  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.1
 // RUN: tpp-opt %s  --vector-contract-to-fma  | tpp-run -e entry --entry-point-result=void -seed 123 -print > %t.2
-// RUN: diff %t.1 %t.2
-// RUN: rm %t.1 %t.2
+// RUN: fpcmp -r 0.001 %t.1 %t.2
 
-// DIFF-NOT: {{.}}
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>

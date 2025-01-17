@@ -149,22 +149,28 @@ func.func @mha_projection(%arg0: memref<512x8x64xf32>, %arg1: memref<64x32x512xf
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-
-func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
-    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+// Fix VNNI blocking factor for lit testing.
+// Prevent mismatches due to target specific VNNI factors.
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+      : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: square_vnni_gemm
@@ -179,20 +185,24 @@ func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-
-func.func @expanded_arg_vnni_gemm(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expanded_arg_vnni_gemm(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
+    %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expanded_arg_vnni_gemm
@@ -211,21 +221,26 @@ func.func @expanded_arg_vnni_gemm(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1]
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on C, before mapping to vnni Gemm.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
-    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+      : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expect_not_to_match_vnni_gemm
@@ -239,21 +254,26 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 // Not VNNI layout. A factor of 5 is not VNNI.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160, 1], offset: ?>>,
-  %arg1: memref<32x64x5xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 5]
-    : memref<64x160xbf16, strided<[160, 1], offset: ?>> into memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>, memref<32x64x5xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160, 1], offset: ?>>,
+    %arg1: memref<32x64x5xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 5]
+      : memref<64x160xbf16, strided<[160, 1], offset: ?>> into memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x5xbf16, strided<[160, 5, 1], offset: ?>>, memref<32x64x5xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expect_not_to_match_vnni_gemm
@@ -267,19 +287,24 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on A, before mapping to vnni Gemm.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%arg0, %arg1 : memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expect_not_to_match_vnni_gemm(%arg0: memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>,
+    %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%arg0, %arg1 : memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expect_not_to_match_vnni_gemm
@@ -294,21 +319,26 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<32x64x2xbf16, strided<[12
 
 // Make sure we can handle interchange on the iterators, but with the right
 // access patterns.
-func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
-    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+      : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<32x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: vnni_gemm_interchanged
@@ -325,21 +355,26 @@ func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], off
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Not VNNI layout. The VNNI is not innermost in the access pattern for B.
-func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
-    : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<2x64x32xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
+      : memref<64x64xbf16, strided<[64, 1], offset: ?>> into memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<2x64x32xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: expect_not_to_match_vnni_gemm
@@ -353,21 +388,26 @@ func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 8, 2]
-    : memref<64x16xbf16, strided<[64, 1], offset: ?>> into memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
-    outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 8, 2]
+      : memref<64x16xbf16, strided<[64, 1], offset: ?>> into memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
+      outs(%arg2 : memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: non_square_vnni_gemm
@@ -383,21 +423,26 @@ func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offse
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-func.func @non_square_vnni_gemm_1(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
-  %arg1: memref<8x64x2xbf16>, %arg2: memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
-  %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [4, 8, 2]
-    : memref<4x16xbf16, strided<[64, 1], offset: ?>> into memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
-    ins(%expanded, %arg1 : memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
-    outs(%arg2 : memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
-      ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
-        %1 = arith.mulf %in, %in_2 : bf16
-        %2 = arith.addf %out, %1 : bf16
-        linalg.yield %2 : bf16
-    }
-  return
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @non_square_vnni_gemm_1(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
+    %arg1: memref<8x64x2xbf16>, %arg2: memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
+    %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [4, 8, 2]
+      : memref<4x16xbf16, strided<[64, 1], offset: ?>> into memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction"]}
+      ins(%expanded, %arg1 : memref<4x8x2xbf16, strided<[64, 2, 1], offset: ?>>, memref<8x64x2xbf16>)
+      outs(%arg2 : memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
+        ^bb0(%in: bf16, %in_2: bf16, %out: bf16):
+          %1 = arith.mulf %in, %in_2 : bf16
+          %2 = arith.addf %out, %1 : bf16
+          linalg.yield %2 : bf16
+      }
+    return
+  }
 }
 
 // CHECK-LABEL: non_square_vnni_gemm_1

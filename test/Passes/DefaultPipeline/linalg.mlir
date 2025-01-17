@@ -207,36 +207,41 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 // CHECK-SAME:  %[[ARG0:.+]]: memref<64x4x4xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<64x2x4x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<4x4xbf16>
-func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
-                              %arg2: memref<4x4xbf16>) {
-  // CHECK: %[[C0:.*]] = arith.constant 0 : index
-  // CHECK: call @xsmm_brgemm_dispatch
-  // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
-  // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
+module attributes {
+  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
+    = #dlti.target_device_spec<"vnni" = 2 : i32>>
+} {
+  func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
+                                %arg2: memref<4x4xbf16>) {
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+    // CHECK: call @xsmm_brgemm_dispatch
+    // CHECK: %[[ptr0:.*]] = memref.extract_aligned_pointer_as_index %[[ARG0]]
+    // CHECK-NEXT: %[[ptr_cast0:.*]] = arith.index_cast %[[ptr0]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr0:.*]] = llvm.inttoptr %[[ptr_cast0]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
-  // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr1:.*]] = memref.extract_aligned_pointer_as_index %[[ARG1]]
+    // CHECK-NEXT: %[[ptr_cast1:.*]] = arith.index_cast %[[ptr1]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr1:.*]] = llvm.inttoptr %[[ptr_cast1]] : i64 to !llvm.ptr
 
-  // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
-  // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
-  // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
+    // CHECK: %[[ptr2:.*]] = memref.extract_aligned_pointer_as_index %[[ARG2]]
+    // CHECK-NEXT: %[[ptr_cast2:.*]] = arith.index_cast %[[ptr2]] : index to i64
+    // CHECK-NEXT: %[[llvm_ptr2:.*]] = llvm.inttoptr %[[ptr_cast2]] : i64 to !llvm.ptr
 
-  // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
-  %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [64, 4, 2, 2]
-    : memref<64x4x4xbf16> into memref<64x4x2x2xbf16>
-  linalg.generic {
-    indexing_maps = [#map, #map1, #map2],
-    iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
-    ins(%expanded, %arg1 : memref<64x4x2x2xbf16>, memref<64x2x4x2xbf16>)
-    outs(%arg2 : memref<4x4xbf16>) {
-      ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
-        %5 = arith.mulf %in, %in_5 : bf16
-        %6 = arith.addf %out, %5 : bf16
-        linalg.yield %6 : bf16
+    // CHECK: call @xsmm_brgemm_invoke({{.*}}%[[llvm_ptr0]], %[[C0]], %[[llvm_ptr1]], %[[C0]], %[[llvm_ptr2]], %[[C0]]
+    %expanded = memref.expand_shape %arg0 [[0], [1], [2, 3]] output_shape [64, 4, 2, 2]
+      : memref<64x4x4xbf16> into memref<64x4x2x2xbf16>
+    linalg.generic {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction", "reduction"]}
+      ins(%expanded, %arg1 : memref<64x4x2x2xbf16>, memref<64x2x4x2xbf16>)
+      outs(%arg2 : memref<4x4xbf16>) {
+        ^bb0(%in: bf16, %in_5: bf16, %out: bf16):
+          %5 = arith.mulf %in, %in_5 : bf16
+          %6 = arith.addf %out, %5 : bf16
+          linalg.yield %6 : bf16
+    }
+    return
   }
-  return
 }
 
 // -----

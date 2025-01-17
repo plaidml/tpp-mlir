@@ -99,7 +99,8 @@ convertTransposeOp(PatternRewriter &rewriter, Operation *transposeOp,
   if (vnni::utils::isInVnniLayout(vnni::utils::VnniOperandRank::TRANSPOSE,
                                   outType)) {
     // Adjust ldo based on vnni factor
-    auto vnniFactor = *vnni::utils::getVnniBlockingFactor(outType);
+    auto vnniFactor = vnni::utils::getVnniBlockingFactor(outType, transposeOp);
+    assert(vnniFactor && "Failed to get VNNI blocking factor");
     unaryInfo.ldo = unaryInfo.ldo / vnniFactor;
   } else {
     std::swap(unaryInfo.m, unaryInfo.n);

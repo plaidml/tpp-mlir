@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "TPP/Transforms/Utils/VNNIUtils.h"
+#include "TPP/Transforms/Utils/DLTIUtils.h"
+
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -20,26 +22,30 @@ namespace mlir {
 namespace vnni {
 namespace utils {
 
-std::optional<int64_t> getVnniBlockingFactor(Type type) {
-  auto elementType = getElementTypeOrSelf(type);
-  if (elementType.isBF16())
-    return libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
-  return std::nullopt;
-}
+unsigned getVnniBlockingFactor(Type type, Operation *op) {
+  unsigned blockingFactor = 0;
 
-// Until we have a better way to express the VNNI layout (see: #563), it is up
-// to the callee to specify the expected rank in the VNNI layout as the rank
-// depends on the operations we are dealing with.
-bool isInVnniLayout(VnniOperandRank expectedRank, MemRefType memref) {
-  if (memref.getRank() != static_cast<int64_t>(expectedRank) ||
-      !memref.getElementType().isBF16()) {
-    return false;
+  auto elementType = getElementTypeOrSelf(type);
+  if (elementType.isBF16()) {
+    // Check if a VNNI factor hint is associated to the IR via DLTI.
+    auto vnniValue = dlti::utils::query(op, {"CPU", "vnni"});
+    if (succeeded(vnniValue)) {
+      if (auto intAttr = llvm::dyn_cast<IntegerAttr>(*vnniValue))
+        blockingFactor = intAttr.getInt();
+    } else {
+      blockingFactor = libxsmm_cpuid_dot_pack_factor(LIBXSMM_DATATYPE_BF16);
+    }
   }
-  return memref.getShape().back() == vnni::utils::getVnniBlockingFactor(memref);
+
+  // Ensure that the factor is divisible by two.
+  if (blockingFactor % 2 != 0)
+    return 0;
+
+  return blockingFactor;
 }
 
 bool isInVnniLayout(linalg::LinalgOp linalgOp,
-                    std::optional<int64_t> blockingFactor) {
+                    std::optional<unsigned> blockingFactor) {
   // Narrow down type operations - VNNI only applies to contractions.
   if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
@@ -96,10 +102,12 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   //   - statically known
   //   - multiple of 2 or equal to the specified factor
   auto vnniDimSize = typeB.getShape().back();
-  if (!(vnniDimSize != ShapedType::kDynamic &&
-        typeA.getShape().back() == vnniDimSize &&
-        (blockingFactor ? vnniDimSize == *blockingFactor
-                        : vnniDimSize % 2 == 0)))
+  if (vnniDimSize == ShapedType::kDynamic || vnniDimSize == 0 ||
+      vnniDimSize % 2 != 0)
+    return false;
+  if (typeA.getShape().back() != vnniDimSize)
+    return false;
+  if (blockingFactor && vnniDimSize != *blockingFactor)
     return false;
 
   // The split reduction dimension size should also match.
@@ -109,15 +117,24 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp,
   return true;
 }
 
-bool isInVnniLayout(VnniOperandRank expectedRank, VectorType vector) {
-  return isInVnniLayout(static_cast<int64_t>(expectedRank), vector);
+bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
+                    std::optional<unsigned> blockingFactor) {
+  return isInVnniLayout(static_cast<int64_t>(expectedRank), shape,
+                        blockingFactor);
 }
 
-bool isInVnniLayout(int64_t expectedRank, VectorType vector) {
-  if (vector.getRank() != expectedRank || !vector.getElementType().isBF16()) {
+bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
+                    std::optional<unsigned> blockingFactor) {
+  if (shape.getRank() != expectedRank || !shape.getElementType().isBF16())
     return false;
-  }
-  return vector.getShape().back() == vnni::utils::getVnniBlockingFactor(vector);
+
+  auto vnniDim = shape.getShape().back();
+  if (vnniDim == 0 || vnniDim % 2 != 0)
+    return false;
+  if (blockingFactor && vnniDim != *blockingFactor)
+    return false;
+
+  return true;
 }
 
 } // namespace utils

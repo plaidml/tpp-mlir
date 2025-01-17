@@ -1,6 +1,6 @@
 // RUN: tpp-run -e entry --entry-point-result=void  -print %s > %t.1
 // RUN: tpp-opt %s --loop-invariant-code-motion  --vectorization-pass --loop-invariant-code-motion --hoist-vector-transfer | tpp-run -e entry --entry-point-result=void  -print > %t.2
-// RUN: diff %t.1 %t.2
+// RUN: diff -q %t.1 %t.2
 // RUN: rm %t.1 %t.2
 
 module {

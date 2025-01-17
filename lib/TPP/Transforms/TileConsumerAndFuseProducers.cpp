@@ -8,6 +8,7 @@
 
 #include "TPP/Passes.h"
 #include "TPP/Transforms/Transforms.h"
+#include "TPP/Transforms/Utils/DLTIUtils.h"
 #include "TPP/Transforms/Utils/TransformUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -457,28 +458,10 @@ static int64_t getTileForDim(linalg::LinalgOp linalgOp, unsigned dim) {
   int64_t tile = 32;
 
   // Check if a tile size hint is associated to the IR via DLTI.
-  auto deriveFromDLTI = [&](ModuleOp moduleOp) {
-    if (!moduleOp)
-      return;
-    TargetSystemSpecInterface sysSpec = moduleOp.getTargetSystemSpec();
-    if (!sysSpec)
-      return;
-    auto deviceId = StringAttr::get(linalgOp->getContext(), "CPU");
-    auto deviceSpec = sysSpec.getDeviceSpecForDeviceID(deviceId);
-    if (!deviceSpec)
-      return;
-    auto tileSizeId = StringAttr::get(linalgOp->getContext(), "tile_size");
-    DataLayoutEntryInterface entry =
-        (*deviceSpec).getSpecForIdentifier(tileSizeId);
-    if (!entry)
-      return;
-    Attribute value = entry.getValue();
-    if (auto intAttr = llvm::dyn_cast<IntegerAttr>(value))
+  auto tileValue = dlti::utils::query(linalgOp, {"CPU", "tile_size"});
+  if (succeeded(tileValue))
+    if (auto intAttr = llvm::dyn_cast<IntegerAttr>(*tileValue))
       tile = intAttr.getInt();
-    // TODO: might want to print a warning if tile_size exists as a key but the
-    //       associated attribute has an unexpected type.
-  };
-  deriveFromDLTI(linalgOp->getParentOfType<mlir::ModuleOp>());
 
   SmallVector<int64_t, 4> loopsRange = linalgOp.getStaticLoopRanges();
   if (loopsRange[dim] == ShapedType::kDynamic)

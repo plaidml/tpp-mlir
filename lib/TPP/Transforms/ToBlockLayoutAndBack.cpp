@@ -333,19 +333,19 @@ mlir::linalgx::packVNNIMatmulOp(RewriterBase &rewriter,
 
   OpOperand &operandB = matmulOp->getOpOperand(1);
   auto blockingFactor =
-      vnni::utils::getVnniBlockingFactor(operandB.get().getType());
+      vnni::utils::getVnniBlockingFactor(operandB.get().getType(), matmulOp);
   if (!blockingFactor) {
     return rewriter.notifyMatchFailure(matmulOp,
                                        "unsupported blocking factor for type");
   }
 
-  if (vnni::utils::isInVnniLayout(matmulOp, *blockingFactor)) {
+  if (vnni::utils::isInVnniLayout(matmulOp)) {
     return rewriter.notifyMatchFailure(matmulOp, "already packed to VNNI");
   }
 
   Location loc = matmulOp.getLoc();
   SmallVector<OpFoldResult> tilesOnSmallK = {
-      rewriter.getI64IntegerAttr(*blockingFactor)};
+      rewriter.getI64IntegerAttr(blockingFactor)};
   SmallVector<std::pair<Value, unsigned>> kOperands;
   matmulOp.mapIterationSpaceDimToAllOperandDims(dims->k.back(), kOperands);
   if (kOperands.size() != 2)
@@ -409,12 +409,14 @@ mlir::linalgx::packVNNIBRGemmOp(RewriterBase &rewriter,
 
   Value operandB = brgemmOp.getInputs()[1];
   // Blocking factor on the `k` dimension.
-  auto blockingFactor = vnni::utils::getVnniBlockingFactor(operandB.getType());
+  auto blockingFactor =
+      vnni::utils::getVnniBlockingFactor(operandB.getType(), brgemmOp);
   if (!blockingFactor) {
     return rewriter.notifyMatchFailure(brgemmOp,
                                        "unsupported blocking factor for type");
   }
-  SmallVector<OpFoldResult> tilesOnK = {rewriter.getI64IntegerAttr(2)};
+  SmallVector<OpFoldResult> tilesOnK = {
+      rewriter.getI64IntegerAttr(blockingFactor)};
 
   Location loc = brgemmOp.getLoc();
   // Reshape input A.
