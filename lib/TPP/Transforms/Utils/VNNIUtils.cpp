@@ -44,7 +44,8 @@ unsigned getVnniBlockingFactor(Type type, Operation *op) {
   return blockingFactor;
 }
 
-bool isInVnniLayout(linalg::LinalgOp linalgOp, unsigned blockingFactor) {
+bool isInVnniLayout(linalg::LinalgOp linalgOp,
+                    std::optional<unsigned> blockingFactor) {
   // Narrow down type operations - VNNI only applies to contractions.
   if (!linalg::isaContractionOpInterface(linalgOp))
     return false;
@@ -106,7 +107,7 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp, unsigned blockingFactor) {
     return false;
   if (typeA.getShape().back() != vnniDimSize)
     return false;
-  if (blockingFactor && vnniDimSize != blockingFactor)
+  if (blockingFactor && vnniDimSize != *blockingFactor)
     return false;
 
   // The split reduction dimension size should also match.
@@ -117,20 +118,20 @@ bool isInVnniLayout(linalg::LinalgOp linalgOp, unsigned blockingFactor) {
 }
 
 bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
-                    unsigned blockingFactor) {
+                    std::optional<unsigned> blockingFactor) {
   return isInVnniLayout(static_cast<int64_t>(expectedRank), shape,
                         blockingFactor);
 }
 
 bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
-                    unsigned blockingFactor) {
+                    std::optional<unsigned> blockingFactor) {
   if (shape.getRank() != expectedRank || !shape.getElementType().isBF16())
     return false;
 
   auto vnniDim = shape.getShape().back();
   if (vnniDim == 0 || vnniDim % 2 != 0)
     return false;
-  if (blockingFactor && vnniDim != blockingFactor)
+  if (blockingFactor && vnniDim != *blockingFactor)
     return false;
 
   return true;

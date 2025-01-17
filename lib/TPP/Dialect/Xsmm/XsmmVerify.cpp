@@ -77,20 +77,19 @@ static LogicalResult verifyGemmDispatchAndInvokeLikeOp(InvokeTy gemmOp) {
   for (auto flag : flags) {
     int64_t gemmFlag = cast<IntegerAttr>(flag).getInt();
     if (gemmFlag == static_cast<int64_t>(xsmm::GemmFlags::VNNI_A) &&
-        (!vnniFactor || !vnni::utils::isInVnniLayout(expectedVnniRankIns,
-                                                     operandA, vnniFactor))) {
+        !vnni::utils::isInVnniLayout(expectedVnniRankIns, operandA,
+                                     vnniFactor)) {
       return gemmOp.emitOpError(
           "expect VNNI layout for operand A or invalid VNNI_A flags");
     }
     if (gemmFlag == static_cast<int64_t>(xsmm::GemmFlags::VNNI_B) &&
-        (!vnniFactor || !vnni::utils::isInVnniLayout(expectedVnniRankIns,
-                                                     operandB, vnniFactor))) {
+        !vnni::utils::isInVnniLayout(expectedVnniRankIns, operandB,
+                                     vnniFactor)) {
       return gemmOp.emitOpError(
           "expect VNNI layout for operand B or invalid VNNI_B flags");
     }
     if (gemmFlag == static_cast<int64_t>(xsmm::GemmFlags::VNNI_C) &&
-        (!vnniFactor || !vnni::utils::isInVnniLayout(expectedVnniRankOuts, outC,
-                                                     vnniFactor))) {
+        !vnni::utils::isInVnniLayout(expectedVnniRankOuts, outC, vnniFactor)) {
       return gemmOp.emitOpError(
           "expect VNNI layout for operand C or invalid VNNI_C flags");
     }

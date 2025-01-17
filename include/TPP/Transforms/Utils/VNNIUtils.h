@@ -44,16 +44,17 @@ unsigned getVnniBlockingFactor(Type type, Operation *op = nullptr);
 // Return true if the shaped type is in VNNI layout with rank `expectedRank`.
 // Optionally, the check can be constrained to a specific VNNI blocking factor.
 bool isInVnniLayout(VnniOperandRank expectedRank, ShapedType shape,
-                    unsigned blockingFactor = 0);
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
 // Return true if the shaped type is in VNNI layout with rank `expectedRank`.
 // Optionally, the check can be constrained to a specific VNNI blocking factor.
 bool isInVnniLayout(int64_t expectedRank, ShapedType shape,
-                    unsigned blockingFactor = 0);
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
 // Return true if the linalg operation is in VNNI layout.
 // Optionally, the check can be constrained to a specific VNNI blocking factor.
-bool isInVnniLayout(linalg::LinalgOp linalgOp, unsigned blockingFactor = 0);
+bool isInVnniLayout(linalg::LinalgOp linalgOp,
+                    std::optional<unsigned> blockingFactor = std::nullopt);
 
 } // namespace utils
 } // namespace vnni
