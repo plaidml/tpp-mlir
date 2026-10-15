@@ -249,10 +249,10 @@ std::unique_ptr<llvm::Module> lowerToLLVMIR(Operation *module,
 
   auto codeGenOpt = (llvm::CodeGenOptLevel)optLevel.getValue();
 
-  // These options should force fused MLA, but they don't. :/
-  // Adding unsafe math attribute to functions below do the trick.
+  // Fused FP ops (FMA) are enabled by adding the unsafe math attribute to
+  // each function below; the obsolete TargetOptions::AllowFPOpFusion knob was
+  // removed upstream and had no effect here anyway.
   llvm::TargetOptions targetOptions;
-  targetOptions.AllowFPOpFusion = llvm::FPOpFusion::FPOpFusionMode::Fast;
   targetMachine.reset(target->createTargetMachine(
       llvm::Triple(targetMachineOptStr.triple), targetMachineOptStr.cpu,
       targetMachineOptStr.features, targetOptions,

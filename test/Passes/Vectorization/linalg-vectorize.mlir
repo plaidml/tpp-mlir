@@ -21,7 +21,7 @@ func.func @vectorize_eltwise(
     %arg0: tensor<256x256xf32>, %arg1: tensor<256x256xf32>
     ) -> tensor<256x256xf32> {
   %e = tensor.empty() : tensor<256x256xf32>
-  %0 = linalg.add
+  %0 = linalg.elementwise <add>
     ins(%arg0, %arg1 : tensor<256x256xf32>, tensor<256x256xf32>)
     outs(%e : tensor<256x256xf32>) -> tensor<256x256xf32>
   return %0 : tensor<256x256xf32>
@@ -104,7 +104,7 @@ func.func @vectorize_memref(%arg0: memref<256x256xf32>,
   linalg.matmul
     ins(%arg0, %arg1 : memref<256x256xf32>, memref<256x256xf32>)
     outs(%arg2 : memref<256x256xf32>)
-  linalg.add
+  linalg.elementwise <add>
     ins(%arg2, %arg3 : memref<256x256xf32>, memref<256x256xf32>)
     outs(%arg2 : memref<256x256xf32>)
   return
@@ -119,14 +119,14 @@ func.func @vectorize_memref(%arg0: memref<256x256xf32>,
 func.func @negative_vectorize_dynamic_shapes(
     %arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>
     ) -> tensor<?x?xf32> {
-  %0 = linalg.add
+  %0 = linalg.elementwise <add>
     ins(%arg0, %arg0 : tensor<?x?xf32>, tensor<?x?xf32>)
     outs(%arg1 : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
 
 // CHECK-LABEL: @negative_vectorize_dynamic_shapes
-// CHECK: linalg.add
+// CHECK: linalg.elementwise <add>
 
 // -----
 

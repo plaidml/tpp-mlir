@@ -36,7 +36,7 @@ module {
     %bcastScale_val = linalg.broadcast ins(%scale:!oneDimf32) outs(%bcastScale:!twoDimf32) dimensions = [1]
 
     %scaleRes_fp32 = tensor.empty() : !twoDimf32
-    %r = linalg.mul ins(%castToF32_val, %bcastScale_val : !twoDimf32, !twoDimf32) outs(%scaleRes_fp32 : !twoDimf32) -> !twoDimf32
+    %r = linalg.elementwise <mul> ins(%castToF32_val, %bcastScale_val : !twoDimf32, !twoDimf32) outs(%scaleRes_fp32 : !twoDimf32) -> !twoDimf32
     
     return %r : !twoDimf32
   }
@@ -120,7 +120,7 @@ module {
     %bcastScaleRes = linalg.broadcast ins(%neg_exp2_val:!oneDimf32) outs(%scaleRes:!twoDimf32) dimensions = [1]
 
     %scaledC = tensor.empty() : !twoDimf32
-    %scaleRes_val = linalg.mul ins(%dquant_val, %bcastScaleRes : !twoDimf32, !twoDimf32) outs(%scaledC : !twoDimf32) -> !twoDimf32
+    %scaleRes_val = linalg.elementwise <mul> ins(%dquant_val, %bcastScaleRes : !twoDimf32, !twoDimf32) outs(%scaledC : !twoDimf32) -> !twoDimf32
     
     // Down-convert Cf32 -> Ci8
     %castToi8 = tensor.empty() : !twoDimi8

@@ -28,16 +28,24 @@ namespace {
 /// Replace a linalg.add with one operand the single user of a contraction,
 /// which has a zero-filled, "identity-mapped" destination and is dominated by
 /// the `other` operand, by the contraction with `other` as its dest.
-struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::AddOp> {
-  using OpRewritePattern<linalg::AddOp>::OpRewritePattern;
+struct FoldAddIntoDestRewrite : public OpRewritePattern<linalg::ElementwiseOp> {
+  using OpRewritePattern<linalg::ElementwiseOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::AddOp addOp,
+  LogicalResult matchAndRewrite(linalg::ElementwiseOp addOp,
                                 PatternRewriter &rewriter) const override {
+    // Pattern only applies on a binary elementwise add.
+    if (addOp.getKind() != linalg::ElementwiseKind::add)
+      return failure();
+
+    // For now, pattern only applies on tensor types (memref support is TODO).
+    if (!addOp.hasPureTensorSemantics())
+      return failure();
+
     Value dominatingOperand = nullptr;
     linalg::LinalgOp dominatedOp = nullptr;
     {
-      auto firstOperand = addOp.getOperand(0);
-      auto secondOperand = addOp.getOperand(1);
+      auto firstOperand = addOp.getInputs()[0];
+      auto secondOperand = addOp.getInputs()[1];
 
       // Can only put one of addOp's operands in the dest/out arg of the other's
       // defining op based on suitable dominance.

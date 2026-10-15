@@ -51,10 +51,8 @@ struct LinalgConvertCompareSelectToMaximumf
         select.getOperand(1) != cmpf.getOperand(0))
       return failure();
     rewriter.setInsertionPointAfter(&op.getBody()->front());
-    auto maxf = arith::MaximumFOp::create(rewriter, 
-        op.getLoc(),
-        dyn_cast<arith::CmpFOp>(op.getBody()->getOperations().begin())
-            ->getOperands());
+    auto maxf = arith::MaximumFOp::create(rewriter, op.getLoc(),
+                                          cmpf.getOperand(0), cmpf.getOperand(1));
     dyn_cast<YieldOp>(op.getBody()->getTerminator()).setOperand(0, maxf);
 
     // Deletion in reverse order due to dependences

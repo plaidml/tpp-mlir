@@ -64,7 +64,8 @@ struct ConvertAddInplace : public OpRewritePattern<linalg::GenericOp> {
     rewriter.replaceOpWithNewOp<linalg::GenericOp>(
         op, op.getResultTypes(), inputs, outputs, indexingMaps, iteratorTypes,
         [&](OpBuilder &builder, Location loc, ValueRange regionArgs) {
-          auto scalarOp = arith::AddFOp::create(builder, loc, regionArgs);
+          auto scalarOp =
+              arith::AddFOp::create(builder, loc, regionArgs[0], regionArgs[1]);
           linalg::YieldOp::create(builder, loc, scalarOp.getResult());
         });
     return success();

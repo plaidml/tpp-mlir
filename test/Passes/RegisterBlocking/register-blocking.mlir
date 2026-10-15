@@ -419,7 +419,7 @@ func.func @fuse_eltwise_consumer_and_initializator(
   %acc = linalg.fill ins(%c0 : f32) outs(%e : !matC) -> !matC
   %0 = linalg.matmul ins(%arg0, %arg1 : !matA, !matB)
     outs(%acc : !matC) -> !matC
-  %1 = linalg.add ins(%0, %bias : !matC, !matC)
+  %1 = linalg.elementwise <add> ins(%0, %bias : !matC, !matC)
     outs(%e : !matC) -> !matC
   return %1 : !matC
 }
@@ -430,7 +430,7 @@ func.func @fuse_eltwise_consumer_and_initializator(
 // CHECK: scf.for
 // CHECK:   linalg.matmul{{.*}}-> tensor<2x32xf32>
 // CHECK:   scf.yield
-// CHECK: linalg.add{{.*}}-> tensor<2x32xf32>
+// CHECK: linalg.elementwise <add>{{.*}}-> tensor<2x32xf32>
 
 // -----
 
@@ -444,34 +444,34 @@ func.func @fuse_only_eltwise_consumers(
   >>}
 {
   %e = tensor.empty() : !mat
-  %acc = linalg.sub ins(%arg0, %arg1 : !mat, !mat)
+  %acc = linalg.elementwise <sub> ins(%arg0, %arg1 : !mat, !mat)
     outs(%e : !mat) -> !mat
   %0 = linalg.matmul ins(%arg0, %arg1 : !mat, !mat)
     outs(%acc : !mat) -> !mat
-  %1 = linalg.add ins(%0, %arg3 : !mat, !mat)
+  %1 = linalg.elementwise <add> ins(%0, %arg3 : !mat, !mat)
     outs(%e : !mat) -> !mat
   %2 = linalg.matmul ins(%1, %arg1 : !mat, !mat)
     outs(%arg2 : !mat) -> !mat
-  %3 = linalg.mul ins(%2, %arg3 : !mat, !mat)
+  %3 = linalg.elementwise <mul> ins(%2, %arg3 : !mat, !mat)
     outs(%e : !mat) -> !mat
   return %3 : !mat
 }
 
 // CHECK-LABEL: @fuse_only_eltwise_consumers
 // Unfused eltwise producer
-// CHECK: linalg.sub{{.*}}-> tensor<256x256xf32>
+// CHECK: linalg.elementwise <sub>{{.*}}-> tensor<256x256xf32>
 // Tiled and fused first matmul
 // CHECK-COUNT-2: scf.for
 // CHECK: scf.for
 // CHECK:   linalg.matmul{{.*}}-> tensor<2x32xf32>
 // CHECK:   scf.yield
-// CHECK: linalg.add{{.*}}-> tensor<2x32xf32>
+// CHECK: linalg.elementwise <add>{{.*}}-> tensor<2x32xf32>
 // Tiled and fused second matmul
 // CHECK-COUNT-2: scf.for
 // CHECK: scf.for
 // CHECK:   linalg.matmul{{.*}}-> tensor<2x32xf32>
 // CHECK:   scf.yield
-// CHECK: linalg.mul{{.*}}-> tensor<2x32xf32>
+// CHECK: linalg.elementwise <mul>{{.*}}-> tensor<2x32xf32>
 
 // -----
 
@@ -488,7 +488,7 @@ func.func @negative_fuse_multi_use_consumer(
 {
   %0 = linalg.matmul ins(%arg0, %arg1 : !matA, !matB)
     outs(%arg2 : !matC) -> !matC
-  %1 = linalg.add ins(%0, %bias : !matC, !matC)
+  %1 = linalg.elementwise <add> ins(%0, %bias : !matC, !matC)
     outs(%0 : !matC) -> !matC
   return %1 : !matC
 }
@@ -500,7 +500,7 @@ func.func @negative_fuse_multi_use_consumer(
 // CHECK-COUNT-3: scf.for
 // CHECK:   linalg.matmul{{.*}}-> tensor<2x32xf32>
 // CHECK:   scf.yield
-// CHECK: linalg.add{{.*}}-> tensor<256x128xf32>
+// CHECK: linalg.elementwise <add>{{.*}}-> tensor<256x128xf32>
 
 // -----
 

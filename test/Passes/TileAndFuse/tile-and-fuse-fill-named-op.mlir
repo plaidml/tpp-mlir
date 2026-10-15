@@ -13,16 +13,16 @@ func.func @fuse_fill(%arg0: tensor<8x32x32x32xf32>, %arg1: tensor<32x32x32x32xf3
     %transposed = linalg.transpose ins(%arg1 : tensor<32x32x32x32xf32>) outs(%0 : tensor<32x32x32x32xf32>) permutation = [0, 1, 3, 2] 
     %1 = linalg.mmt4d ins(%arg0, %transposed : tensor<8x32x32x32xf32>, tensor<32x32x32x32xf32>) outs(%fill : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
     %2 = tensor.empty() : tensor<8x32x32x32xf32>
-    %3 = linalg.add ins(%cst_1, %1 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%1 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
-    %6 = linalg.max ins(%3, %cst_0 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%3 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
+    %3 = linalg.elementwise <add> ins(%cst_1, %1 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%1 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
+    %6 = linalg.elementwise <max_signed> ins(%3, %cst_0 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%3 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
 
     %7 = tensor.empty() : tensor<32x32x32x32xf32>
     %transposed_0 = linalg.transpose ins(%arg4 : tensor<32x32x32x32xf32>) outs(%7 : tensor<32x32x32x32xf32>) permutation = [0, 1, 3, 2] 
     %8 = linalg.mmt4d ins(%6, %transposed_0 : tensor<8x32x32x32xf32>, tensor<32x32x32x32xf32>) outs(%fill : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
     %9 = tensor.empty() : tensor<8x32x32x32xf32>
-    %10 = linalg.add ins(%cst_1, %8 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%8 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
+    %10 = linalg.elementwise <add> ins(%cst_1, %8 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%8 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
     %cst_2 = arith.constant 0.000000e+00 : f32
-    %13 = linalg.max ins(%10, %cst_0 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%10 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
+    %13 = linalg.elementwise <max_signed> ins(%10, %cst_0 : tensor<8x32x32x32xf32>, tensor<8x32x32x32xf32>) outs(%10 : tensor<8x32x32x32xf32>) -> tensor<8x32x32x32xf32>
     
     return %13 : tensor<8x32x32x32xf32>
   }

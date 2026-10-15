@@ -696,7 +696,8 @@ Value MLIRGenerator::lowerGenericMatmul(LayerArgs &args, Value chain) {
                if (inputElementType != outputElementType) {
                  if (inputElementType.isFloat()) {
                    arg0 = arith::ExtFOp::create(nestedBuilder, nestedLoc,
-                                                outputElementType, arg0);
+                                                outputElementType, arg0,
+                                                arith::FastMathFlagsAttr{});
                  } else {
                    arg0 = arith::ExtSIOp::create(nestedBuilder, nestedLoc,
                                                  outputElementType, arg0);
@@ -706,7 +707,8 @@ Value MLIRGenerator::lowerGenericMatmul(LayerArgs &args, Value chain) {
                if (weightElementType != outputElementType) {
                  if (weightElementType.isFloat()) {
                    arg1 = arith::ExtFOp::create(nestedBuilder, nestedLoc,
-                                                outputElementType, arg1);
+                                                outputElementType, arg1,
+                                                arith::FastMathFlagsAttr{});
                  } else {
                    arg1 = arith::ExtSIOp::create(nestedBuilder, nestedLoc,
                                                  outputElementType, arg1);
@@ -1088,10 +1090,10 @@ Value MLIRGenerator::lowerNamedBiasAdd(LayerArgs &args, Value chain) {
   Value broadcast =
       linalg::BroadcastOp::create(builder, loc, args.bias.value, emptyTensor, addedDimensions)
           .getResult()[0];
-  Value biasAdd = linalg::AddOp::create(builder, loc, TypeRange{args.output.value.getType()},
-                                             ValueRange{broadcast, chain},
-                                             ValueRange{emptyTensor})
-                      .getResult(0);
+  Value biasAdd = linalg::ElementwiseOp::create(
+                      builder, loc, ValueRange{broadcast, chain},
+                      ValueRange{emptyTensor}, linalg::ElementwiseKind::add)
+                      .getResultTensors()[0];
 
   computeBiasOrReluFlops(outTy);
   return biasAdd;
@@ -1107,9 +1109,10 @@ Value MLIRGenerator::lowerNamedRelu(LayerArgs &args, Value chain) {
   Value emptyTensor = tensor::EmptyOp::create(builder, loc, outTy, ValueRange{});
   auto fill =
       linalg::FillOp::create(builder, loc, zero, emptyTensor)->getResult(0);
-  Value relu = linalg::MaxOp::create(builder, loc, TypeRange{args.output.value.getType()},
-                                 ValueRange{chain, fill}, ValueRange{emptyTensor})
-          .getResult(0);
+  Value relu = linalg::ElementwiseOp::create(
+                   builder, loc, ValueRange{chain, fill},
+                   ValueRange{emptyTensor}, linalg::ElementwiseKind::max_signed)
+                   .getResultTensors()[0];
 
   computeBiasOrReluFlops(outTy);
   return relu;

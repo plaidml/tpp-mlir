@@ -9,9 +9,9 @@
 // CHECK:     %[[MATMUL:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]] :{{.*}}) outs(%[[ARG3]] :{{.*}})
 // CHECK:     %[[EMPTY_BIAS:.+]] = tensor.empty() : tensor<128x768xf32>
 // CHECK:     %[[BROADCAST:.+]] = linalg.broadcast ins(%[[ARG2]] :{{.*}}) outs(%[[EMPTY_BIAS]] :{{.*}})
-// CHECK:     %[[ADD:.+]] = linalg.add ins(%[[BROADCAST]], %[[MATMUL]] :{{.*}}) outs(%[[EMPTY_BIAS]] :{{.*}})
+// CHECK:     %[[ADD:.+]] = linalg.elementwise <add> ins(%[[BROADCAST]], %[[MATMUL]] :{{.*}}) outs(%[[EMPTY_BIAS]] :{{.*}})
 // CHECK:     %[[C0:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:     %[[EMPTY_RELU:.+]] = tensor.empty() : tensor<128x768xf32>
 // CHECK:     %[[FILL:.+]] = linalg.fill ins(%[[C0]] :{{.*}}) outs(%[[EMPTY_RELU]] :{{.*}})
-// CHECK:     %[[MAX:.+]] = linalg.max ins(%[[ADD]], %[[FILL]] :{{.*}}) outs(%[[EMPTY_RELU]] :{{.*}})
+// CHECK:     %[[MAX:.+]] = linalg.elementwise <max_signed> ins(%[[ADD]], %[[FILL]] :{{.*}}) outs(%[[EMPTY_RELU]] :{{.*}})
 // CHECK:     return %[[MAX]]

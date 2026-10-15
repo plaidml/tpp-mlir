@@ -151,8 +151,10 @@ struct ConvertLinalgGenericTo32BitOp : OpRewritePattern<linalg::GenericOp> {
           Value sum;
           if (isFloatType) {
             // cast inputs
-            auto a32 = arith::ExtFOp::create(b, loc, opType, a);
-            auto b32 = arith::ExtFOp::create(b, loc, opType, bval);
+            auto a32 = arith::ExtFOp::create(b, loc, opType, a,
+                                             arith::FastMathFlagsAttr{});
+            auto b32 = arith::ExtFOp::create(b, loc, opType, bval,
+                                             arith::FastMathFlagsAttr{});
 
             // mul + add
             auto mul = arith::MulFOp::create(b, loc, a32, b32);
@@ -197,7 +199,8 @@ struct ConvertLinalgGenericTo32BitOp : OpRewritePattern<linalg::GenericOp> {
           Value cast;
           if (isFloatType) {
             auto accActualF32 =
-                arith::ExtFOp::create(b, loc, opType, accActual);
+                arith::ExtFOp::create(b, loc, opType, accActual,
+                                      arith::FastMathFlagsAttr{});
 
             auto sum = arith::AddFOp::create(b, loc, acc, accActualF32);
 
