@@ -6,7 +6,7 @@
 func.func @matmul(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -40,7 +40,7 @@ func.func @matmul(
 func.func @batch_matmul(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 4]>
   >>}
@@ -75,7 +75,7 @@ func.func @batch_matmul(
 func.func @batch_reduce_matmul(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 4]>
   >>}
@@ -110,7 +110,7 @@ func.func @batch_reduce_matmul(
 func.func @brgemm_vnni(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [4, 32, 1]>
   >>}
@@ -145,7 +145,7 @@ func.func @brgemm_vnni(
 func.func @matmul_transpose_a(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -173,7 +173,7 @@ func.func @matmul_transpose_a(
 func.func @peel_remainder_block(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [6, 32, 1]>
   >>}
@@ -221,7 +221,7 @@ func.func @peel_remainder_block(
 func.func @tile_multiple_reduction_dims_vnni(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [8, 32, 4]>
   >>}
@@ -253,7 +253,7 @@ func.func @tile_multiple_reduction_dims_vnni(
 func.func @tile_small_dims(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [6, 32, 64]>
   >>}
@@ -284,7 +284,7 @@ func.func @tile_small_dims(
 func.func @negative_tile_multiple_parallel_dims(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -313,7 +313,7 @@ func.func @negative_tile_multiple_parallel_dims(
 func.func @negative_invalid_blocking_opt(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2]>
   >>}
@@ -335,7 +335,7 @@ func.func @negative_invalid_blocking_opt(
 func.func @negative_tile_memref(
   %arg0: !matA, %arg1: !matB, %arg2: !matC)
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -356,7 +356,7 @@ func.func @negative_tile_memref(
 func.func @negative_tile_dynamic_shapes(
   %arg0: !matA, %arg1: !matB, %arg2: !matC)
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -377,7 +377,7 @@ func.func @negative_tile_dynamic_shapes(
 func.func @negative_tile_non_projected_permutation(
   %arg0: !matA, %arg1: !matB, %arg2: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -409,7 +409,7 @@ func.func @negative_tile_non_projected_permutation(
 func.func @fuse_eltwise_consumer_and_initializator(
   %arg0: !matA, %arg1: !matB, %bias: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -438,7 +438,7 @@ func.func @fuse_eltwise_consumer_and_initializator(
 func.func @fuse_only_eltwise_consumers(
   %arg0: !mat, %arg1: !mat, %arg2: !mat, %arg3: !mat) -> !mat
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -481,7 +481,7 @@ func.func @fuse_only_eltwise_consumers(
 func.func @negative_fuse_multi_use_consumer(
   %arg0: !matA, %arg1: !matB, %arg2: !matC, %bias: !matC) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}
@@ -511,7 +511,7 @@ func.func @negative_fuse_multi_use_consumer(
 func.func @negative_fuse_transposed_consumer(
   %arg0: !matA, %arg1: !matB, %arg2: !matC, %bias: !matC) -> !matD
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_blocks", [2, 32, 1]>
   >>}

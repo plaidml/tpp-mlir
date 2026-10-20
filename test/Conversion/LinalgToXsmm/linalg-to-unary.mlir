@@ -295,10 +295,7 @@ func.func @identity_3(%arg0: memref<128x1xf32>, %arg1: memref<128x512xf32>) {
 
 // -----
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @vnni_packing(%arg0 : memref<32x32xbf16, strided<[512, 1], offset: ?>>,
                           %arg1: memref<16x32x2xbf16, strided<[64, 2, 1], offset: ?>>) {
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape[16, 2, 32]
@@ -318,10 +315,7 @@ module attributes {
 
 // -----
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @not_vnni_packing(%arg0 : memref<32x32xf32, strided<[512, 1], offset: ?>>,
                               %arg1: memref<16x32x2xf32, strided<[64, 2, 1], offset: ?>>) {
     %expand_shape = memref.expand_shape %arg0 [[0, 1], [2]] output_shape[16, 2, 32]
@@ -361,10 +355,7 @@ func.func @identity_4(%arg0: memref<1024xbf16>, %arg1: memref<128x1024xbf16>) {
 
 #map = affine_map<(d0) -> (d0 * 32)>
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @vnni_packing_1(%arg1: memref<128x128xbf16>, %arg2: memref<4x4x16x32x2xbf16>) {
     scf.forall (%arg3, %arg4) in (4, 4) {
       %0 = affine.apply #map(%arg4)

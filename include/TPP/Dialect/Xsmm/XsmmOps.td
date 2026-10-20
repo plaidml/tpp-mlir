@@ -105,7 +105,7 @@ def Xsmm_GemmOp : Xsmm_Op<"gemm", [MemoryEffects<[MemWrite, MemRead]>]> {
 
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
-    attr-dict `:` functional-type($inputs, results)
+    (`out_type` `=` $out_type^)? attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{
@@ -135,7 +135,7 @@ def Xsmm_BrgemmOp : Xsmm_Op<"brgemm", [MemoryEffects<[MemWrite, MemRead]>]> {
 
   let assemblyFormat = [{
     `(` `data_type` `=` $data_type `,` $inputs `)`
-    attr-dict `:` functional-type($inputs, results)
+    (`out_type` `=` $out_type^)? attr-dict `:` functional-type($inputs, results)
   }];
 
   let extraClassDeclaration = [{

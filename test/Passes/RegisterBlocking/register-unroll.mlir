@@ -9,7 +9,7 @@
 func.func @vector_matmul(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [2, 32, 1]>
   >>}
@@ -39,7 +39,7 @@ func.func @vector_matmul(
 func.func @vector_batch_matmul(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [4, 64, 1]>
   >>}
@@ -69,7 +69,7 @@ func.func @vector_batch_matmul(
 func.func @vector_batch_reduce_matmul(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [4, 64, 2]>
   >>}
@@ -99,7 +99,7 @@ func.func @vector_batch_reduce_matmul(
 func.func @vector_brgemm_vnni(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [1, 64, 1]>
   >>}
@@ -132,7 +132,7 @@ func.func @vector_brgemm_vnni(
 func.func @propagate_unroll_to_contract_reads_writes(
   %arg0: !matA, %arg1: !matB, %arg2: !matC, %idx: index) -> !matC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [2, 32, 1]>
   >>}
@@ -179,7 +179,7 @@ func.func @propagate_unroll_to_contract_reads_writes(
 func.func @negative_invalid_unroll_opt(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [2]>
   >>}
@@ -210,7 +210,7 @@ func.func @negative_invalid_unroll_opt(
 func.func @negative_invalid_kind(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [2, 32, 1]>
   >>}
@@ -238,7 +238,7 @@ func.func @negative_invalid_kind(
 func.func @negative_multiple_parallel_dims(
   %arg0: !vecA, %arg1: !vecB, %arg2: !vecC) -> !vecC
   attributes {
-    dlti.target_system_spec = #dlti.target_system_spec<
+    dlti = #dlti.target_system_spec<
     "CPU" = #dlti.target_device_spec<
       #dlti.dl_entry<"reg_gemm_unroll", [2, 32, 1]>
   >>}

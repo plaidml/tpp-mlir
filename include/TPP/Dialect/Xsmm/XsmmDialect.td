@@ -22,12 +22,6 @@ def Xsmm_Dialect : Dialect {
         see: https://github.com/libxsmm/libxsmm
     }];
     let cppNamespace = "::mlir::xsmm";
-
-    // The optional `out_type` attribute on gemm/brgemm ops is intentionally
-    // carried through `attr-dict` rather than being bound explicitly in the
-    // assembly format. Opt into the legacy behavior so inherent attributes may
-    // be round-tripped via `attr-dict`.
-    let useStrictPropertiesInAssemblyFormat = 0;
 }
 
 //===----------------------------------------------------------------------===//

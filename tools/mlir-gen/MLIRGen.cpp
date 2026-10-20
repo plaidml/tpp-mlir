@@ -462,7 +462,7 @@ void MLIRGenerator::createKernel() {
         {DataLayoutEntryAttr::get(systemKey, deviceSpec)}
     );
 
-    func->setAttr("dlti.target_system_spec", systemSpec);
+    func->setAttr("dlti", systemSpec);
   }
 
 

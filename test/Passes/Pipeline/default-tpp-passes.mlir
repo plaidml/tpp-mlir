@@ -487,10 +487,7 @@ func.func @brgemm(%arg0: memref<2x3x4xf32>, %arg1: memref<2x4x3xf32>, %arg2: mem
 // XSMM-SAME:  %[[ARG0:.+]]: memref<64x4x4xbf16>,
 // XSMM-SAME:  %[[ARG1:.+]]: memref<64x2x4x2xbf16>,
 // XSMM-SAME:  %[[ARG2:.+]]: memref<4x4xbf16>
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @brgemm_bf16(%arg0: memref<64x4x4xbf16>, %arg1: memref<64x2x4x2xbf16>,
                                 %arg2: memref<4x4xbf16>) {
     // XSMM: %[[C0:.*]] = arith.constant 0 : index

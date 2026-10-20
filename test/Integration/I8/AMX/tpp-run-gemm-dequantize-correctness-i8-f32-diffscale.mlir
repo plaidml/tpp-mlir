@@ -2,9 +2,9 @@
 // RUN: tpp-run -e entry --entry-point-result=void -print --nano-kernels --gemm-unroll=16,16,16 --registerBlocking=32,32,64 --splat-to-random -seed 123 --init-type quant %s > %t.2
 // RUN: fpcmp -r 0.001 %t.1 %t.2
 
-// IR-COUNT-4: amx.tile_zero
-// IR-COUNT-4: amx.tile_muli
-// IR-COUNT-4: amx.tile_store
+// IR-COUNT-4: x86.amx.tile_zero
+// IR-COUNT-4: x86.amx.tile_muli
+// IR-COUNT-4: x86.amx.tile_store
 
 // IR: scf.for
 // IR-COUNT-2:     vector.transfer_read

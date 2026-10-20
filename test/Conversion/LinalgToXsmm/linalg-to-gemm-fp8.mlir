@@ -8,10 +8,7 @@
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // Fix VNNI blocking factor for lit testing.
 // Prevent mismatches due to target specific VNNI factors.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 4 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 4 : i32>>}> {
   func.func @square_vnni_gemm_e5m2(%arg0: memref<64x16x4xf8E5M2, strided<[64, 4, 1], offset: ?>>,
     %arg1: memref<16x64x4xf8E5M2>, %arg2: memref<64x64xf8E5M2, strided<[64, 1], offset: ?>>) {
     linalg.generic {
@@ -37,10 +34,7 @@ module attributes {
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 4 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 4 : i32>>}> {
   func.func @square_vnni_gemm_e4m3(%arg0: memref<64x16x4xf8E4M3FN, strided<[64, 4, 1], offset: ?>>,
     %arg1: memref<16x64x4xf8E4M3FN>, %arg2: memref<64x64xf8E4M3FN, strided<[64, 1], offset: ?>>) {
     linalg.generic {

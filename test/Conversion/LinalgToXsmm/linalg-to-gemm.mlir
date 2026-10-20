@@ -151,10 +151,7 @@ func.func @mha_projection(%arg0: memref<512x8x64xf32>, %arg1: memref<64x32x512xf
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 // Fix VNNI blocking factor for lit testing.
 // Prevent mismatches due to target specific VNNI factors.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @square_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
@@ -188,10 +185,7 @@ module attributes {
 // Mixed-precision: bf16 inputs are extended to f32 and accumulated into an f32
 // output. The kernel input `data_type` stays bf16 while the wider output type
 // is carried via `out_type` (f32 = 1).
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @square_vnni_gemm_f32_acc(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xf32, strided<[64, 1], offset: ?>>) {
     linalg.generic {
@@ -216,17 +210,14 @@ module attributes {
 // CHECK-SAME:  %[[ARG2:.+]]: memref<64x64xf32, strided<[64, 1], offset: ?>>
 // CHECK: %[[COLLAPSE:.+]] = memref.collapse_shape %[[ARG0]] {{\[}}[0], [1, 2]]
 // CHECK: %[[DIS:.+]] = xsmm.gemm.dispatch [64, 64, 64, 64, 64, 64] flags = (vnni_b) data_type = bf16 {out_type = 1 : i64}
-// CHECK: xsmm.gemm(data_type = bf16, %[[DIS]], %[[COLLAPSE]], %[[ARG1]], %[[ARG2]]) {out_type = 1 : i64}
+// CHECK: xsmm.gemm(data_type = bf16, %[[DIS]], %[[COLLAPSE]], %[[ARG1]], %[[ARG2]]) out_type = f32
 
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d1, d3, d0)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @expanded_arg_vnni_gemm(%arg0: memref<64x32x2xbf16, strided<[64, 2, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     linalg.generic {
@@ -259,10 +250,7 @@ module attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on C, before mapping to vnni Gemm.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
@@ -292,10 +280,7 @@ module attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
 // Not VNNI layout. A factor of 5 is not VNNI.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x160xbf16, strided<[160, 1], offset: ?>>,
     %arg1: memref<32x64x5xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 5]
@@ -325,10 +310,7 @@ module attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Require a transpose on A, before mapping to vnni Gemm.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @expect_not_to_match_vnni_gemm(%arg0: memref<32x64x2xbf16, strided<[128, 2, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     linalg.generic {
@@ -357,10 +339,7 @@ module attributes {
 
 // Make sure we can handle interchange on the iterators, but with the right
 // access patterns.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @vnni_gemm_interchanged(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<32x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
@@ -393,10 +372,7 @@ module attributes {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d1)>
 
 // Not VNNI layout. The VNNI is not innermost in the access pattern for B.
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @expect_not_to_match_vnni_gemm(%arg0: memref<64x64xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<2x64x32xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 32, 2]
@@ -426,10 +402,7 @@ module attributes {
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @non_square_vnni_gemm(%arg0: memref<64x16xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<8x64x2xbf16>, %arg2: memref<64x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [64, 8, 2]
@@ -461,10 +434,7 @@ module attributes {
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3, d2, d0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d1, d2)>
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @non_square_vnni_gemm_1(%arg0: memref<4x16xbf16, strided<[64, 1], offset: ?>>,
     %arg1: memref<8x64x2xbf16>, %arg2: memref<4x64xbf16, strided<[64, 1], offset: ?>>) {
     %expanded = memref.expand_shape %arg0 [[0], [1, 2]] output_shape [4, 8, 2]
