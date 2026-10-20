@@ -307,7 +307,7 @@ func.func @fold_pack_expect_to_fail_multiple_uses(
   %unpack = linalg.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %dest
     : tensor<2x2x32x32xbf16> -> tensor<64x64xbf16>
   %use = call @some_use(%0) : (tensor<2x2x32x32xbf16>) -> (tensor<64x64xbf16>)
-  %add = linalg.add ins(%use, %unpack : tensor<64x64xbf16>, tensor<64x64xbf16>)
+  %add = linalg.elementwise <add> ins(%use, %unpack : tensor<64x64xbf16>, tensor<64x64xbf16>)
                     outs(%dest: tensor<64x64xbf16>) -> tensor<64x64xbf16>
   return %add : tensor<64x64xbf16>
 }

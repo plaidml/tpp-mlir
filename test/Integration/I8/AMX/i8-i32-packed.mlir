@@ -4,7 +4,7 @@
 // RUN: tpp-opt --default-tpp-passes="nano-kernel registerBlocking=32,32,64 gemm-unroll=16,16,16" %s | tpp-run -e entry --target-feature="-avx, -avx2, +amx_tile, +amx_int8" --entry-point-result=void --print --splat-to-random -seed 123 --init-type mixed %s > %t.2
 // RUN: fpcmp -r 0.001 %t.1 %t.2
 
-// IR-COUNT-4: amx.tile_muli
+// IR-COUNT-4: x86.amx.tile_muli
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d2, d4, d6, d3)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d1, d2, d6, d5, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d4, d5)>

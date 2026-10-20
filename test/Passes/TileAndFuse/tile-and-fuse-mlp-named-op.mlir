@@ -6,11 +6,11 @@ func.func @mlp(%arg0: tensor<32x64x4x4xbf16>, %arg1: tensor<128x64x4x4xbf16>, %a
     %1 = linalg.mmt4d ins(%arg0, %transposed : tensor<32x64x4x4xbf16>, tensor<128x64x4x4xbf16>) outs(%arg3 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
     %2 = tensor.empty() : tensor<32x128x4x4xbf16>
     %broadcasted = linalg.broadcast ins(%arg2 : tensor<128x4xbf16>) outs(%2 : tensor<32x128x4x4xbf16>) dimensions = [0, 2]
-    %3 = linalg.add ins(%broadcasted, %1 : tensor<32x128x4x4xbf16>, tensor<32x128x4x4xbf16>) outs(%arg3 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
+    %3 = linalg.elementwise <add> ins(%broadcasted, %1 : tensor<32x128x4x4xbf16>, tensor<32x128x4x4xbf16>) outs(%arg3 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
     %cst = arith.constant 0.000000e+00 : bf16
     %4 = tensor.empty() : tensor<32x128x4x4xbf16>
     %5 = linalg.fill ins(%cst : bf16) outs(%4 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
-    %6 = linalg.max ins(%3, %5 : tensor<32x128x4x4xbf16>, tensor<32x128x4x4xbf16>) outs(%arg3 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
+    %6 = linalg.elementwise <max_signed> ins(%3, %5 : tensor<32x128x4x4xbf16>, tensor<32x128x4x4xbf16>) outs(%arg3 : tensor<32x128x4x4xbf16>) -> tensor<32x128x4x4xbf16>
     return %6 : tensor<32x128x4x4xbf16>
 }
 

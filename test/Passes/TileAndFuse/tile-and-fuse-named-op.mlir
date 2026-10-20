@@ -28,7 +28,7 @@ func.func @matmul_eletwise_matmul_and_relu(%arg0: tensor<32x64xf32>, %arg1: tens
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
     %1 = tensor.empty() : tensor<32x32xf32>
     %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
-    %3 = linalg.max ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
+    %3 = linalg.elementwise <max_signed> ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
     return %3 : tensor<32x32xf32>
 }
 
@@ -60,7 +60,7 @@ func.func @matmul_eletwise_blk_matmul(%arg0: tensor<4x4x32x32xf32>, %arg1: tenso
     %cst = arith.constant 0.000000e+00 : f32
     %2 = tensor.empty() : tensor<4x4x32x32xf32>
     %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4x4x32x32xf32>) -> tensor<4x4x32x32xf32>
-    %4 = linalg.max ins(%1, %3 : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>) outs(%arg2 : tensor<4x4x32x32xf32>) -> tensor<4x4x32x32xf32>
+    %4 = linalg.elementwise <max_signed> ins(%1, %3 : tensor<4x4x32x32xf32>, tensor<4x4x32x32xf32>) outs(%arg2 : tensor<4x4x32x32xf32>) -> tensor<4x4x32x32xf32>
     return %4 : tensor<4x4x32x32xf32>
 }
 
@@ -101,7 +101,7 @@ func.func @matmul_sequence_fusion_with_relu(%arg0: tensor<32x64xf32>, %arg1: ten
     outs(%arg6 : tensor<32x32xf32>) -> tensor<32x32xf32> // [M, N2] * [N2, N3]
   %3 = tensor.empty() : tensor<32x32xf32>
   %4 = linalg.fill ins(%c0 : f32) outs(%3 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %5 = linalg.max ins(%2, %4 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %5 = linalg.elementwise <max_signed> ins(%2, %4 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
   return %5 : tensor<32x32xf32>
 }
 
@@ -134,7 +134,7 @@ func.func @matmul_chain_multi_use_into_relu(%arg0: tensor<32x64xf32>, %arg1: ten
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
     %1 = tensor.empty() : tensor<32x32xf32>
     %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
-    %3 = linalg.max ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+    %3 = linalg.elementwise <max_signed> ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
     return %3 : tensor<32x32xf32>
 }
 
@@ -167,8 +167,8 @@ func.func @negative_matmul_chain_multi_user(%arg0: tensor<32x64xf32>, %arg1: ten
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<32x64xf32>, tensor<64x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
     %1 = tensor.empty() : tensor<32x32xf32>
     %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
-    %3 = linalg.max ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
-    %4 = linalg.add ins(%3, %0 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%3 : tensor<32x32xf32>) -> tensor<32x32xf32>
+    %3 = linalg.elementwise <max_signed> ins(%0, %2 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
+    %4 = linalg.elementwise <add> ins(%3, %0 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%3 : tensor<32x32xf32>) -> tensor<32x32xf32>
     return %4 : tensor<32x32xf32>
 }
 

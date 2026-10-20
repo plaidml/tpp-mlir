@@ -133,10 +133,7 @@ func.func @none_on_binary_add(%arg0: memref<256x128xf32>) -> memref<256x512xf32>
 
 // -----
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_32xbf16:  memref<32xbf16, strided<[32], offset:?>> = dense<1.000000e+00> alignment = 128
@@ -181,10 +178,7 @@ module attributes {
 
 // -----
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_32xbf16:  memref<32xbf16, strided<[32], offset:?>> = dense<1.000000e+00> alignment = 128
@@ -230,10 +224,7 @@ module attributes {
 
 // -----
 
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   memref.global "private" constant @__constant_4x16x32x2xbf16 : memref<4x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_8x16x32x2xbf16 :  memref<8x16x32x2xbf16> = dense<1.000000e+00> alignment = 128
   memref.global "private" constant @__constant_32x32xbf16:  memref<32x32xbf16> = dense<1.000000e+00> alignment = 128

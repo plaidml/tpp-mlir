@@ -46,7 +46,7 @@ func.func @duplicate_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
         linalg.yield %10 : f32
   } -> tensor<32x64xf32>
   // CHECK-NOT: linalg.fill
-  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
+  %5 = linalg.elementwise <add> ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
                   outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
   return %5 : tensor<32x64xf32>
 }
@@ -151,7 +151,7 @@ func.func @duplicate_non_zero_fill_on_contractions(%arg0: tensor<32x512xf32>,
         linalg.yield %10 : f32
   } -> tensor<32x64xf32>
   // CHECK-NOT: linalg.fill
-  %5 = linalg.add ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
+  %5 = linalg.elementwise <add> ins(%3, %4 : tensor<32x64xf32>, tensor<32x64xf32>)
                   outs(%1 : tensor<32x64xf32>) -> tensor<32x64xf32>
   return %5 : tensor<32x64xf32>
 }
@@ -195,7 +195,7 @@ func.func @matmuls_1(%arg0: tensor<32x32xf32>, %arg1: tensor<32x32xf32>) -> tens
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %2 = linalg.matmul ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %3 = linalg.add ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
+  %3 = linalg.elementwise <add> ins(%arg0, %arg1 : tensor<32x32xf32>, tensor<32x32xf32>)
                   outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>
   %4 = linalg.matmul ins(%3, %2 : tensor<32x32xf32>, tensor<32x32xf32>)
                      outs(%1 : tensor<32x32xf32>) -> tensor<32x32xf32>

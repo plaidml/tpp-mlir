@@ -16,8 +16,22 @@
 
 using namespace mlir;
 
+// The TableGen-generated op classes emit backward-compatibility builder shims
+// whose definitions call the now-deprecated `build`/`create` overloads
+// (superseded upstream by the Properties-based overloads). GCC reports these
+// self-referential calls under -Werror=deprecated-declarations even though they
+// occur within other deprecated functions. Suppress the diagnostic for the
+// generated code only; the guard follows the LLVM convention used in
+// mlir/include/mlir/Bindings/Python/Nanobind.h.
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
 #define GET_OP_CLASSES
 #include "TPP/Dialect/Xsmm/XsmmOps.cpp.inc"
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 using namespace mlir::xsmm;
 

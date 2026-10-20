@@ -120,11 +120,14 @@ struct BroadcastIntoEltwise
 // TODO: Linalg eltwise fusion pass could be generalized to operate on LinalgOp
 //       instead of GenericOp.
 // TODO: Extend linalg scalar inlining pass.
-struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
-  using OpRewritePattern<linalg::MaxOp>::OpRewritePattern;
+struct FillIntoMax : public OpRewritePattern<linalg::ElementwiseOp> {
+  using OpRewritePattern<linalg::ElementwiseOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::MaxOp maxOp,
+  LogicalResult matchAndRewrite(linalg::ElementwiseOp maxOp,
                                 PatternRewriter &rewriter) const override {
+    if (maxOp.getKind() != linalg::ElementwiseKind::max_signed)
+      return rewriter.notifyMatchFailure(maxOp, "expects max_signed kind");
+
     if (!maxOp.hasPureTensorSemantics())
       return rewriter.notifyMatchFailure(maxOp, "expects tensor semantics");
 
@@ -177,9 +180,11 @@ struct FillIntoMax : public OpRewritePattern<linalg::MaxOp> {
           operands.append(constants);
           Value max;
           if (isa<FloatType>(getElementTypeOrSelf(resultTypes[0])))
-            max = arith::MaximumFOp::create(nestedBuilder, nestedLoc, operands);
+            max = arith::MaximumFOp::create(nestedBuilder, nestedLoc,
+                                            operands[0], operands[1]);
           else
-            max = arith::MaxSIOp::create(nestedBuilder, nestedLoc, operands);
+            max = arith::MaxSIOp::create(nestedBuilder, nestedLoc, operands[0],
+                                         operands[1]);
           linalg::YieldOp::create(nestedBuilder, nestedLoc, ValueRange{max});
         });
     rewriter.replaceOp(maxOp, genericOp->getResults());

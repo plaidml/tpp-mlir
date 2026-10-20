@@ -8,10 +8,7 @@
 // CHECK-SAME:  %[[ARG0:.+]]: memref<128x1024xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<512x2048x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<128x2048xbf16>)
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @matmul_tensor(%arg0: tensor<128x1024xbf16>,
                     %arg1: tensor<512x2048x2xbf16>,
                     %arg2: tensor<128x2048xbf16>) -> tensor<128x2048xbf16> {
@@ -58,10 +55,7 @@ module attributes {
 // CHECK-SAME:  %[[ARG0:.+]]: memref<128x1024xbf16>,
 // CHECK-SAME:  %[[ARG1:.+]]: memref<512x2048x2xbf16>,
 // CHECK-SAME:  %[[ARG2:.+]]: memref<128x2048xbf16>)
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @matmul_memref(%arg0: memref<128x1024xbf16>,
                     %arg1: memref<512x2048x2xbf16>,
                     %arg2: memref<128x2048xbf16>) -> memref<128x2048xbf16> {
@@ -107,10 +101,7 @@ module attributes {
 // CHECK: %[[ARG0:.+]]: memref<4x256x512xbf16>,
 // CHECK: %[[ARG1:.+]]: memref<4x512x1024xbf16>,
 // CHECK: %[[ARG2:.+]]: memref<256x1024xbf16>)
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @brgemm_static_tensor(%arg0: tensor<4x256x512xbf16>, %arg1: tensor<4x512x1024xbf16>, %arg2: tensor<256x1024xbf16>) -> tensor<256x1024xbf16> {
     // CHECK: %[[alloc:.*]] = memref.alloc{{.*}}: memref<4x256x1024x2xbf16>
     %0 = tensor.empty() : tensor<4x256x1024x2xbf16>
@@ -157,10 +148,7 @@ module attributes {
 // CHECK: %[[ARG0:.+]]: memref<4x256x512xbf16>,
 // CHECK: %[[ARG1:.+]]: memref<4x256x1024x2xbf16>,
 // CHECK: %[[ARG2:.+]]: memref<256x1024xbf16>)
-module attributes {
-  "#dlti.sys_spec" = #dlti.target_system_spec<"CPU"
-    = #dlti.target_device_spec<"vnni" = 2 : i32>>
-} {
+module <{dlti = #dlti.target_system_spec<"CPU" = #dlti.target_device_spec<"vnni" = 2 : i32>>}> {
   func.func @brgemm_static_memref(%arg0: memref<4x256x512xbf16>, %arg1: memref<4x256x1024x2xbf16>, %arg2: memref<256x1024xbf16>) -> memref<256x1024xbf16> {
     // CHECK: call @xsmm_brgemm_dispatch
 

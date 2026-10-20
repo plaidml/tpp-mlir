@@ -4,7 +4,7 @@ func.func @broadcast_into_add_outer_dim(%arg0: tensor<8xf32>,
     %arg1: tensor<16x8xf32>) -> tensor<16x8xf32> {
   %e = tensor.empty() : tensor<16x8xf32>
   %0 = linalg.broadcast ins(%arg0 : tensor<8xf32>) outs(%e : tensor<16x8xf32>) dimensions = [0]
-  %1 = linalg.add ins(%0, %arg1 : tensor<16x8xf32>, tensor<16x8xf32>)
+  %1 = linalg.elementwise <add> ins(%0, %arg1 : tensor<16x8xf32>, tensor<16x8xf32>)
                   outs(%e : tensor<16x8xf32>) -> tensor<16x8xf32>
   return %1 : tensor<16x8xf32>
 }
@@ -26,7 +26,7 @@ func.func @broadcast_into_add_inner_dim(%arg0: tensor<8xf32>,
     %arg1: tensor<8x4xf32>) -> tensor<8x4xf32> {
   %e = tensor.empty() : tensor<8x4xf32>
   %0 = linalg.broadcast ins(%arg0 : tensor<8xf32>) outs(%e : tensor<8x4xf32>) dimensions = [1]
-  %1 = linalg.add ins(%0, %arg1 : tensor<8x4xf32>, tensor<8x4xf32>)
+  %1 = linalg.elementwise <add> ins(%0, %arg1 : tensor<8x4xf32>, tensor<8x4xf32>)
                   outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   return %1 : tensor<8x4xf32>
 }
@@ -48,7 +48,7 @@ func.func @broadcast_into_mul(%arg0: tensor<8xf32>,
     %arg1: tensor<8x4xf32>) -> tensor<8x4xf32> {
   %e = tensor.empty() : tensor<8x4xf32>
   %0 = linalg.broadcast ins(%arg0 : tensor<8xf32>) outs(%e : tensor<8x4xf32>) dimensions = [1]
-  %1 = linalg.mul ins(%0, %arg1 : tensor<8x4xf32>, tensor<8x4xf32>)
+  %1 = linalg.elementwise <mul> ins(%0, %arg1 : tensor<8x4xf32>, tensor<8x4xf32>)
                   outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   return %1 : tensor<8x4xf32>
 }
@@ -198,14 +198,14 @@ func.func @no_broadcast_fold_non_tensor(%arg0: memref<8xf32>,
     %arg1: memref<8x4xf32>,
     %arg2: memref<8x4xf32>) {
   linalg.broadcast ins(%arg0 : memref<8xf32>) outs(%arg2 : memref<8x4xf32>) dimensions = [1]
-  linalg.add ins(%arg2, %arg1 : memref<8x4xf32>, memref<8x4xf32>)
+  linalg.elementwise <add> ins(%arg2, %arg1 : memref<8x4xf32>, memref<8x4xf32>)
              outs(%arg2 : memref<8x4xf32>)
   return
 }
 
 // CHECK-LABEL: @no_broadcast_fold_non_tensor(
 // CHECK: linalg.broadcast
-// CHECK: linalg.add
+// CHECK: linalg.elementwise <add>
 
 // -----
 
@@ -214,7 +214,7 @@ func.func @fill_lhs_into_max_float(%arg0: tensor<8x4xf32>,
   %e = tensor.empty() : tensor<8x4xf32>
   %0 = linalg.fill ins(%cst : f32)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
-  %1 = linalg.max ins(%0, %arg0 : tensor<8x4xf32>, tensor<8x4xf32>)
+  %1 = linalg.elementwise <max_signed> ins(%0, %arg0 : tensor<8x4xf32>, tensor<8x4xf32>)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   return %1 : tensor<8x4xf32>
 }
@@ -236,7 +236,7 @@ func.func @fill_rhs_into_max_float(%arg0: tensor<8x4xf32>,
   %e = tensor.empty() : tensor<8x4xf32>
   %0 = linalg.fill ins(%cst : f32)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
-  %1 = linalg.max ins(%arg0, %0 : tensor<8x4xf32>, tensor<8x4xf32>)
+  %1 = linalg.elementwise <max_signed> ins(%arg0, %0 : tensor<8x4xf32>, tensor<8x4xf32>)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   return %1 : tensor<8x4xf32>
 }
@@ -258,7 +258,7 @@ func.func @fill_into_max_int(%arg0: tensor<8x4xi32>,
   %e = tensor.empty() : tensor<8x4xi32>
   %0 = linalg.fill ins(%cst : i32)
     outs(%e : tensor<8x4xi32>) -> tensor<8x4xi32>
-  %1 = linalg.max ins(%arg0, %0 : tensor<8x4xi32>, tensor<8x4xi32>)
+  %1 = linalg.elementwise <max_signed> ins(%arg0, %0 : tensor<8x4xi32>, tensor<8x4xi32>)
     outs(%e : tensor<8x4xi32>) -> tensor<8x4xi32>
   return %1 : tensor<8x4xi32>
 }
@@ -282,7 +282,7 @@ func.func @double_fill_into_max(%cst: f32,
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   %1 = linalg.fill ins(%cst1 : f32)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
-  %2 = linalg.max ins(%0, %1 : tensor<8x4xf32>, tensor<8x4xf32>)
+  %2 = linalg.elementwise <max_signed> ins(%0, %1 : tensor<8x4xf32>, tensor<8x4xf32>)
     outs(%e : tensor<8x4xf32>) -> tensor<8x4xf32>
   return %2 : tensor<8x4xf32>
 }
@@ -301,10 +301,10 @@ func.func @double_fill_into_max(%cst: f32,
 func.func @no_fill_fold_non_tensor(%arg0: memref<8x4xf32>,
     %arg1: memref<8x4xf32>, %cst: f32) {
   linalg.fill ins(%cst : f32) outs(%arg1 : memref<8x4xf32>)
-  linalg.max ins(%arg0, %arg1 : memref<8x4xf32>, memref<8x4xf32>) outs(%arg1 : memref<8x4xf32>)
+  linalg.elementwise <max_signed> ins(%arg0, %arg1 : memref<8x4xf32>, memref<8x4xf32>) outs(%arg1 : memref<8x4xf32>)
   return
 }
 
 // CHECK-LABEL: @no_fill_fold_non_tensor(
 // CHECK: linalg.fill
-// CHECK: linalg.max
+// CHECK: linalg.elementwise <max_signed>

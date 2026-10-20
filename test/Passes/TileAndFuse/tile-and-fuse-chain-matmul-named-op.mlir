@@ -17,7 +17,7 @@ func.func @matmul_sequence_fusion(%arg0: tensor<32x64xf32>, %arg1: tensor<64x32x
     outs(%arg6 : tensor<32x32xf32>) -> tensor<32x32xf32> // [M, N2] * [N2, N3]
   %3 = tensor.empty() : tensor<32x32xf32>
   %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<32x32xf32>) -> tensor<32x32xf32>
-  %5 = linalg.max ins(%2, %4 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
+  %5 = linalg.elementwise <max_signed> ins(%2, %4 : tensor<32x32xf32>, tensor<32x32xf32>) outs(%arg2 : tensor<32x32xf32>) -> tensor<32x32xf32>
   return %5 : tensor<32x32xf32>
 }
 
